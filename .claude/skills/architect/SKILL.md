@@ -7,6 +7,7 @@ allowed-tools: Read, Grep, Glob, Task
 # Architect Skill
 
 Design software architecture for the personal_assistant project following established patterns and principles.
+In PRD the user will add "!IMPORTANT!" for items you must address.  Always evaluate this section and propose 1 to 2 solutions to the highlighted issue.
 
 ## Architecture Principles
 
@@ -14,20 +15,20 @@ This project follows **Domain Driven Design** and **Onion Architecture**:
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                   Controllers                        │
-│              (Presentation Layer)                    │
-│         HTTP handling, request validation            │
+│                   Controllers                       │
+│              (Presentation Layer)                   │
+│         HTTP handling, request validation           │
 ├─────────────────────────────────────────────────────┤
-│                    Services                          │
-│              (Business/Domain Layer)                 │
-│    Core business logic, domain rules, validation     │
+│                    Services                         │
+│              (Business/Domain Layer)                │
+│    Core business logic, domain rules, validation    │
 ├─────────────────────────────────────────────────────┤
-│                  Repositories                        │
-│              (Data Access Layer)                     │
-│         Database operations, data mapping            │
+│                  Repositories                       │
+│              (Data Access Layer)                    │
+│         Database operations, data mapping           │
 ├─────────────────────────────────────────────────────┤
-│                    Database                          │
-│                   (SQL Server)                       │
+│                    Database                         │
+│                   (SQL Server)                      │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -46,7 +47,8 @@ All backend changes must be 100% backwards compatible for drops (memories) and a
 
 ## Design Process
 
-For every request, always create an md file and save it to directory /docs/tdd.
+For every request, always create an md file and save it to directory docs/tdd.
+Most times you will be referrencing PRDs in docs/prd.  You can ask /product-manager to create a prd if you don't have enough requirements to do a quality design.
 
 ### 1. Understand Requirements
 - Clarify the feature/change scope
@@ -69,6 +71,7 @@ For every request, always create an md file and save it to directory /docs/tdd.
 - What Pinia stores manage state?
 - What service layer handles API calls?
 - Use `docs/FRONTEND_STYLE_GUIDE.md` for all style decisions.
+- Request the /designer to review proposed frontend changes.
 
 ### 3. Design Patterns to Apply
 
@@ -246,7 +249,7 @@ New or modified endpoints
 Vue components and their responsibilities
 
 ### Testing Plan
-What tests are needed and at what level
+What tests are needed and at what level.  Always add tests for both frontend and backend changes.
 
 ### Implementation Order
 Recommended sequence for building the feature
