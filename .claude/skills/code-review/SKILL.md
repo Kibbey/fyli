@@ -10,6 +10,9 @@ Perform a comprehensive code review for the personal_assistant project, checking
 
 ## Review Checklist
 
+## Backwards Compatability
+All backend changes must be 100% backwards compatible for drops (memories) and access to drops (which users have access to drops they or others created). Breaking changes should be flagged regardless of what they break (i.e. any breaking change, not just drops and access).
+
 ### Architecture Compliance
 
 **Backend (C#/.NET):**
@@ -23,6 +26,7 @@ Perform a comprehensive code review for the personal_assistant project, checking
 - [ ] Global error handling used (throw immediately, catch globally via middleware)
 - [ ] Jsonb column was not used.  Only use Jsonb if other alternatives are not available.
 - [ ] Database changes use EF Core Code-First pattern: POCO entity in `Entities/`, FK config in `StreamContext.OnModelCreating`, `DbSet<T>` property added, migration generated via `dotnet ef migrations add`. No raw SQL for schema changes.
+- [ ] Raw SQL scripts use **SQL Server syntax** (not PostgreSQL): `INT IDENTITY(1,1)` not `SERIAL`, `DATETIME2` not `TIMESTAMPTZ`, `BIT` not `BOOLEAN`, `UNIQUEIDENTIFIER` not `UUID`, `NVARCHAR` for Unicode, square brackets `[TableName]` not double quotes
 
 **Frontend (Vue.js):**
 - [ ] Composition API with `<script setup>` syntax used
@@ -58,11 +62,23 @@ Perform a comprehensive code review for the personal_assistant project, checking
 
 ### Testing
 
+**Backend:**
 - [ ] Tests written for new functionality (TDD approach)
 - [ ] Business layer has unit tests
 - [ ] Repository layer has unit tests
 - [ ] Utilities have unit tests
 - [ ] Minimum 70% coverage target
+
+**Frontend (Vitest + Vue Test Utils):**
+- [ ] New Vue components have corresponding `.test.ts` files
+- [ ] Component tests cover rendering, props, emits, and user interactions
+- [ ] Pinia stores have tests for actions, getters, and state mutations
+- [ ] API service files have tests with Axios mocked
+- [ ] Composables have tests verifying reactive behavior
+- [ ] Utility/helper functions have unit tests
+- [ ] Tests mock external dependencies (API, router, etc.)
+- [ ] Both success and error paths are tested
+- [ ] All frontend tests pass (`cd fyli-fe-v2 && npm run test:unit -- --run`)
 
 ### Security
 

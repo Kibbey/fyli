@@ -45,13 +45,16 @@ TDD Analysis Checklist:
 Build from the bottom up following the 3-tier architecture:
 
 #### 2.1 Database Layer (EF Core Code-First)
-This project uses **EF Core Code-First migrations**. Never write raw SQL for schema changes.
+This project uses **EF Core Code-First migrations** with **SQL Server** (not PostgreSQL). Never write raw SQL for schema changes.
 1. Create/update POCO entity class in `cimplur-core/Memento/Domain/Entities/`
 2. Add FK and index configuration in `StreamContext.cs` → `OnModelCreating`
 3. Add `DbSet<T>` property to `StreamContext.cs`
 4. Generate migration: `cd cimplur-core/Memento && dotnet ef migrations add <Name>`
 5. Update `cimplur-core/docs/DATA_SCHEMA.md` with schema changes
 6. Run migrations to verify they work
+
+**SQL Server Syntax Reminder:** When TDDs include raw SQL reference scripts, ensure they use SQL Server syntax:
+- `INT IDENTITY(1,1)` (not `SERIAL`), `DATETIME2` (not `TIMESTAMPTZ`), `BIT` (not `BOOLEAN`), `UNIQUEIDENTIFIER` (not `UUID`), `NVARCHAR` (not `VARCHAR` for Unicode), square brackets for identifiers
 
 #### 2.2 Repository Layer
 1. Create repository files in `cimplur-core/Repositories/`
@@ -184,14 +187,14 @@ Implement tests as specified in TDD:
 2. **Integration Tests** - Test API endpoints end-to-end
 3. **Component Tests** - Test Vue components in isolation
 
-**Run the test suite** to verify all tests pass before proceeding:
+**Run the test suites** to verify all tests pass before proceeding:
 
 ```bash
-# Run all tests
-dotnet test
+# Backend tests
+cd cimplur-core/Memento && dotnet test
 
-# Run with coverage to verify 70% minimum
-dotnet test --collect:"XPlat Code Coverage"
+# Frontend tests
+cd fyli-fe-v2 && npm run test:unit -- --run
 ```
 
 Fix any failing tests before moving to Phase 7.
@@ -204,6 +207,45 @@ Testing Checklist:
 [ ] Edge cases and error conditions tested
 [ ] Test coverage meets 70% minimum
 [ ] All tests passing (verified by running test suite)
+```
+
+#### Frontend Testing Standards (Vitest + Vue Test Utils)
+
+When a TDD includes frontend work, the following tests MUST be written:
+
+**Component Tests:**
+- Mount components using `@vue/test-utils` (`mount` or `shallowMount`)
+- Test prop rendering and default behavior
+- Test emitted events via `wrapper.emitted()`
+- Test user interactions (clicks, input, form submission)
+- Test conditional rendering (v-if/v-show states)
+- Provide mock Pinia stores and router when needed
+
+**Pinia Store Tests:**
+- Create a fresh Pinia instance per test with `setActivePinia(createPinia())`
+- Test actions including async API calls (mock Axios)
+- Test getters with various state configurations
+- Test state mutations and verify reactivity
+
+**API Service Tests:**
+- Mock Axios using `vi.mock('axios')` or mock the api instance
+- Verify correct HTTP method, URL path, query params, and request body
+- Test success responses and error handling paths
+- Verify auth headers are sent
+
+**Composable Tests:**
+- Test composables inside a Vue component context or with a `withSetup` helper
+- Verify reactive state changes
+- Test cleanup/teardown behavior
+
+**Test file placement:** Next to source file as `<name>.test.ts`
+
+```bash
+# Run frontend tests
+cd fyli-fe-v2 && npm run test:unit -- --run
+
+# Run specific test file
+cd fyli-fe-v2 && npx vitest run src/stores/auth.test.ts
 ```
 
 ### Phase 7: Documentation Updates

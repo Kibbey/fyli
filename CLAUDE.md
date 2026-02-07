@@ -15,6 +15,18 @@ This root repo tracks only shared configuration and orchestration. All subprojec
 
 ## Backend Conventions (cimplur-core)
 
+### Database
+The project uses **SQL Server** (not PostgreSQL). All raw SQL scripts must use SQL Server syntax:
+- `INT IDENTITY(1,1)` for auto-increment (not `SERIAL`)
+- `DATETIME2` for timestamps (not `TIMESTAMPTZ`)
+- `BIT` for booleans (not `BOOLEAN`)
+- `UNIQUEIDENTIFIER` for GUIDs (not `UUID`)
+- `NVARCHAR` for Unicode strings
+- Square brackets `[TableName]` for identifiers (not double quotes)
+
+### Backwards Compatibility
+All backend changes must be 100% backwards compatible for drops (memories) and access to drops (which users have access to drops they or others created).
+
 ### Database Migrations (EF Core Code-First)
 
 The project uses **EF Core Code-First migrations**. Never write raw SQL for schema changes.
