@@ -15,6 +15,7 @@ Systematically debug issues, implement fixes, and document bugs to prevent recur
 1. **Check error logs** in order of priority:
    - `docs/issue.md` - User-reported issues if logs are empty
    - Application logs - Recent errors with stack traces
+   - Server logs are in cimplur-core/Memento/logs
    - Combined log output including info/debug
 
 2. **Identify the error pattern**:
