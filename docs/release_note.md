@@ -1,5 +1,28 @@
 # Release Notes
 
+## 2026-02-09: Terms of Service & Privacy Policy Pages
+
+### New Features
+
+**Legal Pages**
+- Public `/terms` and `/privacy` pages accessible without authentication
+- Casual, family-friendly tone matching the Fyli brand voice
+- Full Google API Services User Data Policy Limited Use disclosure
+- AI third-party provider disclosure (Grok/xAI, OpenAI, Google)
+- Cross-links between Terms and Privacy pages
+- Last updated date footer on each page
+
+**Auth Page Footer Links**
+- Terms and Privacy footer links on both login and registration pages (always visible, even after form submission)
+- Registration terms checkbox links to Terms of Service and Privacy Policy in new tabs
+
+### Technical Details
+
+- `PublicLayout` dynamic width via `$route.meta.wide` route meta flag (680px for legal pages, 480px for auth)
+- `scrollBehavior` added to router for scroll-to-top on navigation
+- Lazy-loaded routes for `/terms` and `/privacy`
+- 8 TermsView tests, 12 PrivacyView tests, 3 new RegisterView tests, 1 new LoginView test
+
 ## 2026-02-08: Google Sign-In & Question Flow Sign-In
 
 ### New Features
