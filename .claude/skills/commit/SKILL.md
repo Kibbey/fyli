@@ -1,6 +1,6 @@
 ---
 name: commit
-description: Commit and push changes across all repos in the monorepo. Detects which repos have changes, stages them, generates conventional commit messages, and pushes. Handles root repo and sub-repos (cimplur-core, fyli-fe-v2, fyli-infra) independently.
+description: Commit and push changes across all repos in the monorepo. Detects which repos have changes, stages them, generates conventional commit messages, and pushes. Handles root repo and sub-repos (cimplur-core, fyli-fe-v2, fyli-html, fyli-infra) independently.
 allowed-tools: Bash, Read, Grep, Glob
 user-invocable: true
 ---
@@ -16,6 +16,7 @@ Commit and push git changes across the fyli monorepo. Each sub-repo is an indepe
 | `/Users/joshuakibbey/Projects/fyli` | Root repo (docs, config, orchestration) |
 | `/Users/joshuakibbey/Projects/fyli/cimplur-core` | Backend (C#/.NET) |
 | `/Users/joshuakibbey/Projects/fyli/fyli-fe-v2` | Frontend (Vue.js) |
+| `/Users/joshuakibbey/Projects/fyli/fyli-html` | Marketing site (static HTML/Sass/Gulp) |
 | `/Users/joshuakibbey/Projects/fyli/fyli-infra` | Infrastructure (AWS) |
 
 > `fyli-fe/` is the legacy frontend. Only include it if it has changes.
