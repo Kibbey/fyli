@@ -1,5 +1,74 @@
 # Release Notes
 
+## 2026-02-09: Storylines & Navigation Restructure
+
+### New Features
+
+**Navigation Restructure**
+- Replaced bottom tab bar with a hamburger drawer navigation pattern
+- New `AppDrawer` slide-out menu with links to Memories, Storylines, Questions, and Account
+- Added persistent floating action button (FAB) for creating new memories from any page
+- Swipe-to-close and escape key support on the drawer
+- Drawer auto-closes on route navigation
+
+**Storylines**
+- New Storylines section for organizing memories into curated collections
+- Storyline list view with "Your Storylines" and "Shared with You" sections
+- Create and edit storylines with name and optional description
+- Storyline detail view with paginated memory list and sort toggle (ascending/descending)
+- Add existing memories to a storyline from the detail view
+- Add/remove memories to storylines via checkbox picker from MemoryCard dropdown menu
+- Storyline selection during memory create and edit flows
+- Storyline badges displayed on memory detail view
+
+**Collaboration**
+- Invite connections to storylines with multi-select
+- Already-invited users shown as disabled in the invite list
+- Creator-only invite button on storyline detail view
+
+### Technical Details
+
+- New `timelineApi.ts` service with 11 API functions for all storyline operations
+- New `storyline` Pinia store for paginated memory fetching with sort support
+- `StorylinePicker` modal component with optimistic toggle and revert-on-failure
+- `AddExistingMemoryModal` for browsing and adding memories to a storyline
+- `connectionApi.ts` updated with `getConnections` function and `Connection` interface
+- 5 new routes added to router (list, create, edit, invite, detail)
+- `Drop.timeline` type changed from `unknown | null` to `Storyline | null`
+- 105+ new tests across 16 test files, 476 total tests passing
+- Also fixed 5 pre-existing test failures (Teleport stubs, clipboard mocks, route mocks)
+
+### Files Changed
+
+**New Files:**
+- `src/components/ui/AppDrawer.vue` - Slide-out navigation drawer
+- `src/components/ui/FloatingActionButton.vue` - Persistent "+" button
+- `src/services/timelineApi.ts` - All storyline API functions
+- `src/stores/storyline.ts` - Storyline detail store
+- `src/components/storyline/StorylineCard.vue` - Card component
+- `src/components/storyline/StorylinePicker.vue` - Add/remove drop modal
+- `src/components/storyline/AddExistingMemoryModal.vue` - Browse memories modal
+- `src/views/storyline/StorylineListView.vue` - List page
+- `src/views/storyline/StorylineDetailView.vue` - Detail page
+- `src/views/storyline/CreateStorylineView.vue` - Create form
+- `src/views/storyline/EditStorylineView.vue` - Edit form with delete
+- `src/views/storyline/InviteToStorylineView.vue` - Invite connections
+
+**Modified Files:**
+- `src/types/index.ts` - Added `Storyline` interface, updated `Drop.timeline` type
+- `src/components/ui/AppNav.vue` - Added hamburger menu button
+- `src/layouts/AppLayout.vue` - Replaced bottom nav with drawer + FAB
+- `src/views/stream/StreamView.vue` - Removed inline FAB
+- `src/components/memory/MemoryCard.vue` - Added storyline picker integration
+- `src/views/memory/CreateMemoryView.vue` - Added storyline selection
+- `src/views/memory/EditMemoryView.vue` - Added storyline selection
+- `src/views/memory/MemoryDetailView.vue` - Added storyline badges
+- `src/services/connectionApi.ts` - Added `getConnections` and `Connection` type
+- `src/router/index.ts` - Added 5 storyline routes
+- `src/test/fixtures.ts` - Added `createStoryline` fixture
+
+---
+
 ## 2026-02-09: Terms of Service & Privacy Policy Pages
 
 ### New Features
