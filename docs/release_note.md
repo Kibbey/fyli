@@ -1,5 +1,63 @@
 # Release Notes
 
+## 2026-02-10: Automatic Account Creation & S3 Image Fix
+
+### Bug Fixes
+
+**S3 Image/Video Retrieval**
+- Fixed three QuestionService methods (`BuildAnswerViewModel`, `BuildRecipientAnswerModel`, `GetAnswerMovieStatus`) that used the wrong userId when generating presigned URLs, causing broken images and videos
+- Removed `Drop.UserId` reassignment in `LinkAnswersToUserAsync` that broke S3 key paths without moving objects
+
+### New Features
+
+**Pre-Created User Accounts**
+- When sending questions, recipients now get a `UserProfile` created automatically via `UserService.FindOrCreateByEmailAsync`
+- `RespondentUserId` is set on `QuestionRequestRecipient` at send time, giving a stable userId for all answer uploads
+- Pre-created users have `AcceptedTerms=null` and `Name=null` until they complete their profile
+
+**Simplified Registration Flow**
+- Replaced terms checkbox with passive "Terms of Service" and "Privacy Policy" disclaimer text on all registration forms
+- New `TermsDisclaimer.vue` component used across `RegisterView`, `InlineAuth`, and `InlineAuthPrompt`
+- Submit button is always enabled (no checkbox gating)
+
+**Profile Completion Flow**
+- New `/complete-profile` API endpoint for pre-created users to set their name and accept terms
+- `WelcomeView.vue` — first sign-in screen prompting for name with "Get Started" button
+- Router guard redirects users with `needsProfileCompletion=true` to the welcome page
+- Google OAuth auto-completes profile (no name prompt needed since Google provides the name)
+- Hello world content (groups + sample drop) only added if user has no existing drops
+
+### Technical Details
+
+**Backend Changes**
+- `UserService`: Added `FindOrCreateByEmailAsync`, `CompleteProfileAsync`, `TryCompletePreCreatedUserAsync` methods; added `GroupService` dependency
+- `UserModel`: Added `NeedsProfileCompletion` property (true when `AcceptedTerms` is null)
+- `UserController.Register`: Detects pre-created users via `TryCompletePreCreatedUserAsync`; removed terms validation
+- `UserController.CompleteProfile`: New `[CustomAuthorization]` endpoint
+- `GoogleAuthService.FindOrCreateUserAsync`: Detects pre-created users and calls `CompleteProfileAsync`
+- `QuestionService.CreateQuestionRequest`: Calls `FindOrCreateByEmailAsync` for all recipients
+- `QuestionService.LinkAnswersToUserAsync`: Simplified — no longer reassigns `Drop.UserId` or includes drop navigation
+- `QuestionService.RegisterAndLinkAnswers`: Simplified — handles pre-created users with backwards-compatible fallback
+- `AccountModels`: Added `CompleteProfileModel`
+
+**Frontend Changes**
+- `TermsDisclaimer.vue`: New reusable component
+- `RegisterView.vue`: Removed terms checkbox, added disclaimer
+- `InlineAuth.vue`: Removed terms checkbox, validation, and useId; added disclaimer
+- `InlineAuthPrompt.vue`: Same changes as InlineAuth
+- `auth.ts` store: Added `needsProfileCompletion` computed and `completeProfile` action
+- `authApi.ts`: Added `completeProfile` function
+- `types/index.ts`: Added `needsProfileCompletion` to User interface
+- `WelcomeView.vue`: New profile completion page
+- `router/index.ts`: Profile completion redirect guard
+- `App.vue`: Added `onMounted` user fetch for authenticated sessions
+
+**Tests Updated**
+- Backend: 236 passing (removed obsolete terms validation test, updated drop ownership assertions to reflect no-transfer behavior)
+- Frontend: 530 passing (updated RegisterView, InlineAuth, InlineAuthPrompt tests to remove checkbox interactions, add disclaimer tests)
+
+---
+
 ## 2026-02-10: Universal Google OAuth & Invitation Flows
 
 ### New Features
