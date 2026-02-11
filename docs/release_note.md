@@ -38,8 +38,9 @@
 - `TimelineShareLinkController` with 6 endpoints under `/api/storylines`
 - Rate limiting on public endpoints (`"public"` and `"registration"` policies)
 - EF Core migration `AddTimelineShareLinks` generated
-- 32 new frontend tests (InlineAuth 12, InlineAuthPrompt 8, API services 12), existing tests updated
-- Backend: 217 tests pass, Frontend: 505 tests pass (1 pre-existing failure)
+- 61 new frontend tests (InlineAuth 12, InlineAuthPrompt 8, StorylineInvite 10, ConnectionInvite 7, SharedMemory 2, API services 22)
+- 20 new backend tests (TimelineShareLinkService 17, GoogleAuthService +3 for share/invite tokens)
+- EF Core migration `AddTimelineShareLinks` generated with production SQL
 
 ### Files Changed
 
@@ -58,7 +59,8 @@
 - `Memento/Controllers/UserController.cs` - New `/preview` endpoint, updated GoogleAuth
 - `Memento/Startup.cs` - DI registration for `TimelineShareLinkService`
 - `DomainTest/Repositories/TestServiceFactory.cs` - New factory methods
-- `DomainTest/Repositories/GoogleAuthServiceTest.cs` - Updated for new params
+- `DomainTest/Repositories/GoogleAuthServiceTest.cs` - Extended with share/invite token tests
+- `DomainTest/Repositories/TimelineShareLinkServiceTest.cs` (new) - 17 service tests
 
 **Frontend (new):**
 - `src/components/auth/InlineAuth.vue` - Reusable auth component
@@ -67,6 +69,16 @@
 - `src/services/connectionInviteApi.ts` - 2 connection invite API functions
 - `src/views/storyline/StorylineInviteView.vue` - Public storyline invite page
 - `src/views/invite/ConnectionInviteView.vue` - Public connection invite page
+
+**Frontend (tests):**
+- `src/components/auth/InlineAuth.test.ts` (new) - 12 tests
+- `src/components/auth/InlineAuthPrompt.test.ts` (new) - 8 tests
+- `src/views/storyline/StorylineInviteView.test.ts` (new) - 10 tests
+- `src/views/invite/ConnectionInviteView.test.ts` (new) - 7 tests
+- `src/views/share/SharedMemoryView.test.ts` (new) - 2 tests
+- `src/services/timelineShareApi.test.ts` (new) - 7 tests
+- `src/services/connectionInviteApi.test.ts` (new) - 2 tests
+- `src/services/authApi.test.ts` (updated) - 13 tests total
 
 **Frontend (modified):**
 - `src/composables/useGoogleSignIn.ts` - Added `shareToken`, `inviteToken` options
