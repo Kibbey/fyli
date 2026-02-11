@@ -241,7 +241,7 @@ onMounted(() => {
     <h2 class="h5 mt-4 mb-2">Contact</h2>
     <p>
       Questions about these terms? Reach us at
-      <a href="mailto:support@fyli.com">support@fyli.com</a>.
+      <a href="mailto:information@fyli.com">information@fyli.com</a>.
     </p>
 
     <hr class="my-4" />
@@ -403,7 +403,7 @@ onMounted(() => {
     <p>
       Your data is retained for as long as your account is active. If you
       would like to delete your account and all associated data, contact us at
-      <a href="mailto:support@fyli.com">support@fyli.com</a> and we will
+      <a href="mailto:information@fyli.com">information@fyli.com</a> and we will
       process your request.
     </p>
 
@@ -431,7 +431,7 @@ onMounted(() => {
     <h2 class="h5 mt-4 mb-2">Contact</h2>
     <p>
       Questions about your privacy? Reach us at
-      <a href="mailto:support@fyli.com">support@fyli.com</a>.
+      <a href="mailto:information@fyli.com">information@fyli.com</a>.
     </p>
 
     <hr class="my-4" />
@@ -591,7 +591,7 @@ describe('TermsView', () => {
 
   it('includes contact email', async () => {
     const wrapper = await mountWithRouter()
-    const mailto = wrapper.find('a[href="mailto:support@fyli.com"]')
+    const mailto = wrapper.find('a[href="mailto:information@fyli.com"]')
     expect(mailto.exists()).toBe(true)
   })
 
@@ -698,7 +698,7 @@ describe('PrivacyView', () => {
 
   it('includes data deletion contact', async () => {
     const wrapper = await mountWithRouter()
-    expect(wrapper.text()).toContain('support@fyli.com')
+    expect(wrapper.text()).toContain('information@fyli.com')
     expect(wrapper.text()).toContain('delete your account')
   })
 
@@ -853,7 +853,7 @@ describe('LoginView — footer links', () => {
 
 - **No backend changes** — all content is static in Vue components
 - **No new dependencies** — uses existing Bootstrap, Vue Router
-- **Contact email** — Using `support@fyli.com` as placeholder. Update if a different address is preferred
+- **Contact email** — Using `information@fyli.com` as placeholder. Update if a different address is preferred
 
 ## Review Feedback Addressed
 

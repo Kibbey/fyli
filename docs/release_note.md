@@ -1,5 +1,83 @@
 # Release Notes
 
+## 2026-02-10: Universal Google OAuth & Invitation Flows
+
+### New Features
+
+**Reusable Inline Auth Components**
+- Extracted auth UI (Google Sign-In, magic link, registration) from `QuestionAnswerView` into reusable `InlineAuth` and `InlineAuthPrompt` components
+- Collapsed CTA with "Have an account? Sign in" / "New here? Sign up" toggle
+- Sign-in form: Google button + magic link email
+- Registration form: Google button + email/name/terms with custom `registerFn` callback support
+- "Signed in as [name]" badge when authenticated
+- `InlineAuthPrompt` variant with "Skip for now" button for post-action registration prompts
+
+**Storyline Invitation Links**
+- New `TimelineShareLink` entity for shareable storyline invitation links
+- Public storyline preview page at `/st/:token` with storyline name, description, creator, memory count, and memory previews
+- Context-specific registration and sign-in endpoints for storylines (`/storylines/:token/register`, `/storylines/:token/signin`)
+- Authenticated users auto-accept invite on page load
+- Google OAuth extended to accept `inviteToken` for atomic join on sign-in
+
+**Connection Invitation Flow**
+- New public connection invite page at `/invite/:token` with inviter name preview
+- Safe `/preview` endpoint that avoids the `LogOffUser()` side-effect of the original endpoint
+- Generic InlineAuth flow (no context-specific registration needed)
+- Authenticated users auto-confirm connection on page load
+
+**Shared Memory Link Improvements**
+- `SharedMemoryView` refactored to use `InlineAuth` with context-specific `registerFn` and `magicLinkFn`
+- Google OAuth extended to accept `shareToken` for atomic access claim on sign-in
+
+### Technical Details
+
+- New `TimelineShareLinks` table with `Token` (unique GUID index), `TimelineId`, `CreatorUserId`, `IsActive`, `ExpiresAt`, `ViewCount`
+- `GoogleAuthService.AuthenticateAsync` extended with `shareToken` and `inviteToken` params
+- `GoogleAuthModel` extended with `ShareToken` and `InviteToken` properties
+- `TimelineShareLinkService` with `CreateLink`, `GetPreview`, `RegisterAndJoin`, `AcceptInvite`, `DeactivateLink`
+- `TimelineShareLinkController` with 6 endpoints under `/api/storylines`
+- Rate limiting on public endpoints (`"public"` and `"registration"` policies)
+- EF Core migration `AddTimelineShareLinks` generated
+- 32 new frontend tests (InlineAuth 12, InlineAuthPrompt 8, API services 12), existing tests updated
+- Backend: 217 tests pass, Frontend: 505 tests pass (1 pre-existing failure)
+
+### Files Changed
+
+**Backend (new):**
+- `Domain/Entities/TimelineShareLink.cs` - Share link entity
+- `Domain/Models/TimelinePreviewModel.cs` - Preview response model
+- `Domain/Repositories/TimelineShareLinkService.cs` - Full service
+- `Memento/Controllers/TimelineShareLinkController.cs` - 6 endpoints
+- `Domain/Migrations/*_AddTimelineShareLinks.cs` - EF Core migration
+- `docs/migrations/AddTimelineShareLinks.sql` - Production SQL
+
+**Backend (modified):**
+- `Domain/Entities/StreamContext.cs` - Added `TimelineShareLinks` DbSet
+- `Domain/Repositories/GoogleAuthService.cs` - Extended with share/invite tokens
+- `Memento/Models/GoogleAuthModel.cs` - Added `ShareToken`, `InviteToken`
+- `Memento/Controllers/UserController.cs` - New `/preview` endpoint, updated GoogleAuth
+- `Memento/Startup.cs` - DI registration for `TimelineShareLinkService`
+- `DomainTest/Repositories/TestServiceFactory.cs` - New factory methods
+- `DomainTest/Repositories/GoogleAuthServiceTest.cs` - Updated for new params
+
+**Frontend (new):**
+- `src/components/auth/InlineAuth.vue` - Reusable auth component
+- `src/components/auth/InlineAuthPrompt.vue` - Post-action registration prompt
+- `src/services/timelineShareApi.ts` - 6 storyline share API functions
+- `src/services/connectionInviteApi.ts` - 2 connection invite API functions
+- `src/views/storyline/StorylineInviteView.vue` - Public storyline invite page
+- `src/views/invite/ConnectionInviteView.vue` - Public connection invite page
+
+**Frontend (modified):**
+- `src/composables/useGoogleSignIn.ts` - Added `shareToken`, `inviteToken` options
+- `src/services/authApi.ts` - Extended `googleAuth` with new params
+- `src/views/question/QuestionAnswerView.vue` - Refactored to use InlineAuth/InlineAuthPrompt
+- `src/views/share/SharedMemoryView.vue` - Refactored to use InlineAuth
+- `src/types/index.ts` - Added `TimelinePreview` interface
+- `src/router/index.ts` - Added `/st/:token` and `/invite/:token` routes
+
+---
+
 ## 2026-02-09: Storylines & Navigation Restructure
 
 ### New Features
