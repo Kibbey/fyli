@@ -1,7 +1,7 @@
 ---
 name: code-review
 description: Review code for quality, standards compliance, and best practices. Use when asked to review code, check for issues, audit code quality, or validate implementations against project standards.
-allowed-tools: Read, Grep, Glob
+allowed-tools: Read, Grep, Glob, Bash
 ---
 
 # Code Review Skill
@@ -53,6 +53,7 @@ All backend changes must be 100% backwards compatible for drops (memories) and a
 - [ ] Emits typed with `defineEmits<EmitsType>()`
 - [ ] Explicit types for refs
 - [ ] Interfaces for API responses and store state
+- [ ] Does the project build (npm run build) with no errors?
 
 **Backend (C#):**
 - [ ] Request/Response DTOs defined

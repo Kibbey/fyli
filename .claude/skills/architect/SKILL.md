@@ -65,6 +65,7 @@ Most times you will be referrencing PRDs in docs/prd.  You can ask /product-mana
 - What request/response models are needed?
 
 **For Frontend Features:**
+- !IMPORTANT! - use fyli-fe-v2 project.  fyli-fe is deprecated and only used for reference.
 - Which views/pages are affected?
 - What components need creation/modification?
 - What composables provide shared logic?
