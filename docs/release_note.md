@@ -1,5 +1,42 @@
 # Release Notes
 
+## 2026-02-11: Memory Sharing at Creation
+
+### New Features
+
+**Two-Step Memory Creation Wizard**
+- Step 1: Write memory (text, date, photos/videos, storylines) — unchanged
+- Step 2: Choose sharing — Everyone (default), Specific People, or Only Me
+- Zero connections auto-saves as private (skips Step 2)
+- "Back" button preserves all Step 1 state
+
+**Per-Person Sharing**
+- New `GET /api/connections/sharing-recipients` endpoint returns all connections with per-user group IDs
+- Each connection gets a `__person:{userId}` UserTag with a single TagViewer for granular sharing
+- Timeline invitees without a UserUser connection are also included
+- Select All / deselect all toggle for bulk selection
+
+### Technical Details
+
+**Backend Changes**
+- `SharingRecipientModel.cs`: New DTO with `UserId`, `UserTagId`, `DisplayName`, `Email`
+- `GroupService.EnsurePerUserGroup`: Creates `__person:{targetUserId}` UserTag atomically with race condition handling (DbUpdateException + ChangeTracker.Clear)
+- `GroupService.GetSharingRecipients`: Queries UserUser + TimelineUser, bulk-fetches existing `__person:*` groups, creates missing ones, returns sorted deduplicated list
+- `ConnectionController.SharingRecipients`: New `GET /api/connections/sharing-recipients` endpoint
+
+**Frontend Changes**
+- `CreateMemoryView.vue`: Rewritten as two-step wizard with v-show for DOM preservation
+- `types/index.ts`: Fixed `Group` interface (`tagId` instead of `id`), added `GroupsResponse` and `SharingRecipient` types
+- `groupApi.ts`: Fixed return type to match `GroupsResponse` wrapper
+- `connectionApi.ts`: Added `getSharingRecipients()` function
+
+**Tests Added**
+- 7 backend integration tests (EnsurePerUserGroup, GetSharingRecipients scenarios)
+- 13 frontend component tests (all sharing modes, loading states, error paths)
+- 1 API service test (getSharingRecipients)
+
+**No Schema Changes** — reuses existing UserTag, TagViewer, TagDrop, UserUser tables
+
 ## 2026-02-10: Automatic Account Creation & S3 Image Fix
 
 ### Bug Fixes
