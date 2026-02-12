@@ -1,5 +1,46 @@
 # Release Notes
 
+## 2026-02-12: Edit Memory — Sharing & Storyline Editing
+
+### New Features
+
+**Two-Step Edit Memory Wizard**
+- Step 1: Edit memory (text, date, photos/videos, storylines) — same fields as before
+- Step 2: Choose sharing — Everyone, Specific People, or Only Me
+- Sharing mode pre-populates from the memory's current tags
+- Zero connections auto-saves directly (skips Step 2)
+- "Back" button preserves all Step 1 state
+
+**Sharing Editing**
+- Users can now change who sees a memory after creation
+- Pre-populates current sharing state: Everyone (All Connections tag), Specific People (matched per-user tags), or Only Me (no tags)
+- Reuses the same `tagIds` field in `PUT /api/drops/{id}` — backend already supported this via `DropsService.Edit()`
+
+**Storyline Editing Fix**
+- Fixed broken storyline editing — backend `DropController.UpdateDrop()` ignores `timelineIds` in the PUT body
+- Now uses individual `POST/DELETE /api/timelines/drops/{dropId}/timelines/{timelineId}` API calls (diff-based: only adds/removes changed storylines)
+- Collapsible storyline selector with icon, badge count, and max-height (matches Create Memory pattern)
+- Auto-expands when memory already belongs to storylines
+
+### Technical Details
+
+**Frontend Changes (no backend changes needed)**
+- `EditMemoryView.vue`: Rewritten as two-step wizard with sharing UI and fixed storyline editing
+- New imports: `getGroups`, `getSharingRecipients`, `addDropToStoryline`, `removeDropFromStoryline`
+- `determineCurrentShareMode()`: Pure function that reverse-engineers sharing state from drop tags
+- Added `aria-label` attributes on all icon-only buttons for accessibility
+
+**Tests Added**
+- 28 frontend component tests covering:
+  - Step 1: form loading, step indicator, Next button, loading spinner, non-editable redirect, error state, image removal, empty text guard
+  - Step 2: sharing options rendering, pre-population (Everyone/Specific/Only Me), Back button, disabled Save validation, displayName fallback
+  - Storyline editing: add, remove, no-change, no timelineIds in PUT body
+  - Save flow: Everyone tagIds, Specific tagIds, Only Me tagIds, image removal, navigation, error handling
+  - Skip Step 2: no connections auto-save
+  - Cancel: navigation
+
+**No Backend Changes, No Schema Changes, No New API Endpoints**
+
 ## 2026-02-11: Memory Sharing at Creation
 
 ### New Features
