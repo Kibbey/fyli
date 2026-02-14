@@ -1,5 +1,44 @@
 # Release Notes
 
+## 2026-02-13: Likes Feature
+
+### New Features
+
+**Like Memories**
+- Users can like shared memories by clicking a heart icon
+- Heart toggles between empty outline and filled red when liked
+- Like count displayed next to the heart
+- Hover over the heart to see who liked the memory via tooltip
+- Likes are available on both the feed card and memory detail view
+- Owners cannot like their own memories (button hidden)
+
+**Like Filtering**
+- Likes (Kind=1) are excluded from comment counts and comment list display
+- Comment count badge only reflects normal comments (Kind=0)
+- "No comments yet" empty state correctly ignores like-only entries
+
+### Technical Details
+
+**Backend Changes**
+- `DropsService.Thank()`: Added self-like guard — throws `NotAuthorizedException` when a user attempts to like their own memory
+- No schema changes — reuses existing Comment entity with `Kind` enum (Normal=0, Thank=1, UnThank=2)
+
+**Frontend Changes**
+- `LikeButton.vue` (new): Reusable component with heart toggle, like count, tooltip, aria-labels, and loading state
+- `MemoryCard.vue`: Added `localComments` ref for like state management, LikeButton integration, comment count filtered to Kind=0
+- `MemoryDetailView.vue`: Added LikeButton integration with `localComments` ref; converted file from 2-space to tab indentation
+- `CommentList.vue`: Changed internal state to `allComments` ref + `comments` computed (filtered to Kind=0)
+- `commentApi.ts`: Added `thankDrop()` function
+
+**Tests Added**
+- 10 LikeButton component tests (rendering, interactions, edge cases, accessibility)
+- 3 MemoryCard tests (like count exclusion, LikeButton props, owner hiding)
+- 3 CommentList tests (like filtering, empty state with likes, countChange exclusion)
+- 1 commentApi service test (thankDrop)
+- 4 backend DropsService tests (self-like guard, create thank, toggle, re-toggle)
+
+**No Schema Changes, No New API Endpoints** — reuses existing `POST /api/comments/{dropId}/thanks`
+
 ## 2026-02-12: Edit Memory — Sharing & Storyline Editing
 
 ### New Features
