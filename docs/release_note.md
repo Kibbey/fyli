@@ -1,5 +1,35 @@
 # Release Notes
 
+## 2026-02-16: Question Recipient Picker
+
+### New Features
+
+**Enhanced Recipient Selection for Questions**
+- When choosing who to ask a question, users can now select from three sources:
+  - **My Connections** — existing contacts from the connections list
+  - **Previously Asked** — people they've sent questions to before
+  - **Add Someone New** — manual email entry (existing behavior)
+- Recipients are deduplicated by email (case-insensitive) so no person appears twice across sections
+- Dynamic subtitle adapts based on whether contacts are available
+
+### Technical Details
+
+**Frontend Changes (AskQuestionsView.vue)**
+- Added `getSharingRecipients()` call alongside `getPreviousRecipients()` using `Promise.allSettled` for resilient parallel loading
+- Idempotency guard prevents re-fetching when navigating between steps
+- `filteredPreviousRecipients` computed property deduplicates previous recipients against connections
+- `handleSend` merges all three sources with case-insensitive email deduplication (connections > previous > manual priority)
+- Connection `displayName` is used as the alias when sending (user's preferred label)
+- No new CSS — reuses existing `.recipient-list` / `.recipient-option` styles
+
+**Tests**
+- 11 new tests added to `AskQuestionsView.test.ts` (18 total, all passing)
+- Covers: connections rendering, deduplication, cross-source merge, case-insensitive dedup, API failure graceful degradation, dynamic subtitle
+
+**No backend changes** — leverages existing `GET /connections/sharing-recipients` and `GET /questions/recipients/previous` APIs.
+
+---
+
 ## 2026-02-14: Auto-Connections
 
 ### New Features
