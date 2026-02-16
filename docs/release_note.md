@@ -1,5 +1,44 @@
 # Release Notes
 
+## 2026-02-14: Auto-Connections
+
+### New Features
+
+**Automatic Connections via Share Links**
+- When a user claims a shared memory link, a bidirectional connection is automatically created between the sharer and recipient
+- Toast notification shows "You're now connected with [Name]" when a new connection is formed
+- Existing connections are not duplicated (idempotent behavior)
+
+**Connections Page**
+- New "Connections" page accessible from the navigation drawer (replaces "Invite")
+- View all connections with name, email, and avatar initial
+- Inline rename: click the pencil icon, edit name, press Enter to save or Escape to cancel
+- Disconnect: click the X icon, confirm via modal, connection is removed from the list
+- Invite form: send connection invitations by email directly from the connections page
+- Empty state with call-to-action when no connections exist
+
+### Technical Details
+
+**Backend Changes**
+- `ConnectionModel.cs`: Added `Email` property to expose connection email addresses
+- `ClaimResult.cs` (new): Return model with `NewConnection` (bool) and `ConnectionName` (string)
+- `SharingService.EnsureConnectionAsync`: Changed return type from `Task` to `Task<bool>` — returns true when a new connection is created
+- `MemoryShareLinkService.ClaimDropAccessAsync` / `GrantDropAccessAsync`: Now return `ClaimResult` instead of `Task`
+- `ShareLinkController.ClaimAccess`: Returns `{ success, newConnection, connectionName }` in response
+
+**Frontend Changes**
+- `ConnectionsView.vue` (new): Full connections management page with list, rename, disconnect, and invite
+- `useToast.ts` (new): Composable for auto-dismissing toast notifications
+- `SharedMemoryView.vue`: Shows toast when share link creates a new connection
+- `connectionApi.ts`: Added `email` to Connection, `deleteConnection`, `renameConnection`
+- `shareLinkApi.ts`: Added `ClaimResult` type, typed `claimAccess` return
+- `AppDrawer.vue`: Changed nav item from "Invite" to "Connections"
+- `router/index.ts`: Added `/connections` route, `/invite` redirects to `/connections`
+
+**Tests Added**
+- Backend: 5 new tests (EnsureConnectionAsync bidirectional, ConfirmationSharingRequest bidirectional, GetConnections email field, RemoveConnection bidirectional+TagViewers, ClaimDropAccess bidirectional+PopulateEveryone)
+- Frontend: 27 new tests across 6 files (ConnectionsView, useToast, SharedMemoryView, AppDrawer, connectionApi, InviteView)
+
 ## 2026-02-13: Likes Feature
 
 ### New Features

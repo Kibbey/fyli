@@ -7,7 +7,10 @@
     "dev:frontend": "cd fyli-fe-v2 && npm run dev",
     "stop": "lsof -ti :5001 -ti :5000 -ti :5174 -ti :8000 | xargs kill -9 2>/dev/null; echo 'All dev servers stopped'",
     "clear:logs": "rm -f cimplur-core/Memento/Memento/logs/*.log; echo 'Logs cleared'",
-    "restart": "npm run stop && npm run dev"
+    "restart": "npm run stop && npm run dev",
+    "deploy:backend": "./deploy.sh backend",
+    "deploy:frontend": "./deploy.sh frontend",
+    "deploy:all": "./deploy.sh all"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

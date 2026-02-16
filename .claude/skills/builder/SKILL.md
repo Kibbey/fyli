@@ -209,44 +209,7 @@ Testing Checklist:
 [ ] All tests passing (verified by running test suite)
 ```
 
-#### Frontend Testing Standards (Vitest + Vue Test Utils)
-
-When a TDD includes frontend work, the following tests MUST be written:
-
-**Component Tests:**
-- Mount components using `@vue/test-utils` (`mount` or `shallowMount`)
-- Test prop rendering and default behavior
-- Test emitted events via `wrapper.emitted()`
-- Test user interactions (clicks, input, form submission)
-- Test conditional rendering (v-if/v-show states)
-- Provide mock Pinia stores and router when needed
-
-**Pinia Store Tests:**
-- Create a fresh Pinia instance per test with `setActivePinia(createPinia())`
-- Test actions including async API calls (mock Axios)
-- Test getters with various state configurations
-- Test state mutations and verify reactivity
-
-**API Service Tests:**
-- Mock Axios using `vi.mock('axios')` or mock the api instance
-- Verify correct HTTP method, URL path, query params, and request body
-- Test success responses and error handling paths
-- Verify auth headers are sent
-
-**Composable Tests:**
-- Test composables inside a Vue component context or with a `withSetup` helper
-- Verify reactive state changes
-- Test cleanup/teardown behavior
-
-**Test file placement:** Next to source file as `<name>.test.ts`
-
-```bash
-# Run frontend tests
-cd fyli-fe-v2 && npm run test:unit -- --run
-
-# Run specific test file
-cd fyli-fe-v2 && npx vitest run src/stores/auth.test.ts
-```
+> **Full testing standards:** See `docs/TESTING_BEST_PRACTICES.md` for detailed backend and frontend testing patterns, examples, and checklists.
 
 ### Phase 7: Documentation Updates
 

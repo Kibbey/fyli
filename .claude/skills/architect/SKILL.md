@@ -178,25 +178,7 @@ Following TDD approach:
 - Integration tests: API endpoints
 - Frontend: Component tests, Store tests, Composable tests, Service tests
 
-**Frontend Testing Requirements (Vitest + Vue Test Utils):**
-
-All frontend TDDs MUST include a testing phase with specific test cases. The frontend test stack is:
-- **Framework:** Vitest with jsdom environment
-- **Component Testing:** @vue/test-utils for mounting and interacting with Vue components
-- **Run command:** `cd fyli-fe-v2 && npm run test:unit`
-
-Frontend test categories to consider for every TDD:
-1. **Component Tests** — Mount components with `@vue/test-utils`, test rendering, props, emits, user interactions, and conditional display logic
-2. **Pinia Store Tests** — Test store actions, getters, and state mutations in isolation using `createPinia()` / `setActivePinia()`
-3. **Composable Tests** — Test composables by calling them inside a `withSetup()` helper or a test component
-4. **API Service Tests** — Mock Axios and verify correct HTTP methods, URLs, params, headers, and response handling
-5. **Utility/Helper Tests** — Pure function tests for any utils
-
-Test file conventions:
-- Place test files next to source files as `<name>.test.ts` (e.g., `src/stores/auth.test.ts`)
-- Use `describe`/`it` blocks with clear test names
-- Mock external dependencies (API calls, router, etc.)
-- Test both success and error paths
+> **Full testing standards:** See `docs/TESTING_BEST_PRACTICES.md` for detailed backend and frontend testing patterns, examples, and checklists.
 
 ## Architecture Output Format
 

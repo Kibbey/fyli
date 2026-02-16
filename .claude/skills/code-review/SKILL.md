@@ -75,11 +75,10 @@ All backend changes must be 100% backwards compatible for drops (memories) and a
 - [ ] Component tests cover rendering, props, emits, and user interactions
 - [ ] Pinia stores have tests for actions, getters, and state mutations
 - [ ] API service files have tests with Axios mocked
-- [ ] Composables have tests verifying reactive behavior
-- [ ] Utility/helper functions have unit tests
-- [ ] Tests mock external dependencies (API, router, etc.)
 - [ ] Both success and error paths are tested
 - [ ] All frontend tests pass (`cd fyli-fe-v2 && npm run test:unit -- --run`)
+
+> **Full testing standards:** See `docs/TESTING_BEST_PRACTICES.md` for detailed patterns and examples.
 
 ### Security
 

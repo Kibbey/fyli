@@ -75,9 +75,14 @@ Add regression tests to prevent the bug from recurring:
 3. **Run existing tests** - Ensure fix doesn't break other functionality
 
 ```bash
-# Run tests to verify fix
-dotnet test
+# Run backend tests to verify fix
+cd cimplur-core/Memento && dotnet test
+
+# Run frontend tests to verify fix
+cd fyli-fe-v2 && npm run test:unit -- --run
 ```
+
+> **Full testing standards:** See `docs/TESTING_BEST_PRACTICES.md` for detailed patterns and examples.
 
 ### Phase 5: Document the Bug
 
