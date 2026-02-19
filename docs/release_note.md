@@ -1,5 +1,46 @@
 # Release Notes
 
+## 2026-02-16: Email Link Fix
+
+### Bug Fixes
+
+**All Email Links Updated for New Frontend**
+- Migrated all 17+ email templates from legacy AngularJS hash routing (`/#/`) to clean Vue 3 URLs
+- Fixed actively broken `QuestionAnswerNotification` email where the link was malformed (`@Model.Link/questions/requests` instead of a proper URL)
+- Fixed `ConnectionRequestQuestion` missing auto-login token (`?link=@Model.Link`)
+- Fixed Login email to preserve `@Model.Route` return destination
+- Fixed `/q/` public question links using wrong base URL (`BaseUrl` → `HostUrl`)
+
+**Email Safe Link System Rewrite**
+- Rewrote `EmailSafeLinkCreator` regex to match clean URLs instead of hash routes
+- `GetPath` now preserves non-auth query parameters (e.g., `questionId`) that were previously stripped
+- Public routes (`/q/`, `/Connection/`, `/api/`) correctly excluded from link conversion
+
+**Security**
+- Added open redirect protection in `LinksController` — validates decoded paths don't contain `://` or start with `//`
+
+### Technical Details
+
+**Backend Changes**
+- `EmailTemplates.cs`: All 17 user-facing templates updated from `/#/` to clean URL paths
+- `EmailSafeLinkCreator.cs`: Full rewrite of `FindAndReplaceLinks` regex and `GetPath` method
+- `LinksController.cs`: Null-token redirect now preserves path for new-user invite flows + open redirect guard
+- `QuestionService.cs`: Fixed 3 instances of `BaseUrl` → `HostUrl` for public `/q/` links; removed Link model override in QuestionAnswerNotification
+- `QuestionReminderJob.cs`: Fixed `BaseUrl` → `HostUrl` for `/q/` links
+
+**Frontend Changes**
+- `MagicLinkView.vue`: Updated route handling for new path format (no leading `/` from `GetPath`)
+
+**Tests Added**
+- `EmailTemplateLinkTests.cs`: 24 tests — parameterized route validation for 19 email types, no-hash-route sweep, footer validation, Login/ForgotPassword/QuestionAnswerNotification dedicated tests
+- `EmailSafeLinkCreatorTests.cs`: 13 tests — GetPath, RetrieveLink, ConvertLink round-trip, FindAndReplaceLinks with public route exclusions
+- `emailRoutes.test.ts`: 13 frontend tests — 12 email destination paths resolve to real routes, no hash routes in router
+- `MagicLinkView.test.ts`: Updated 5 tests for new route format
+
+**Total: 323 backend + 637 frontend = 960 tests passing**
+
+---
+
 ## 2026-02-16: Question Recipient Picker
 
 ### New Features
