@@ -1,5 +1,81 @@
 # Release Notes
 
+## 2026-02-19: AI Question Suggestions (Phase 3 — Storyline Context)
+
+### Enhancement
+
+**Storyline-Aware AI Suggestions**
+When a user creates questions from a storyline detail page, the AI prompt now includes the storyline's name, description, and up to 10 recent memories for deeper context. Access control ensures drop content is only included when the user has an active `TimelineUser` record.
+
+### Backend Changes
+
+- **BuildUserPromptAsync**: Extended with storyline context — queries `Timelines`, `TimelineUsers` (access check), and `TimelineDrops` (recent memory content, truncated to 200 chars)
+- Additional prompt instructions for storyline narrative deepening
+
+### Frontend Changes
+
+- **StorylineDetailView**: New "Ask Questions" button (comment-question-outline icon) in the header action buttons, links to `/questions/new` with `storylineId` and `storylineName` query params
+
+### Tests Added
+
+- 3 backend: `WithStorylineId_IncludesStorylineContext`, `WithInvalidStorylineId_IgnoresStorylineContext`, `WithStorylineNoAccess_ExcludesDropContent`
+- 2 frontend: `shows ask questions button`, `ask questions link includes question icon`
+- **Total: 346 backend + 656 frontend = 1002 tests passing**
+
+---
+
+## 2026-02-19: AI Question Suggestions (Phase 2 — History-Enriched)
+
+### Enhancement
+
+**History-Enriched AI Suggestions**
+The AI question suggestion prompt now includes the user's previous questions (up to 50) and recent answer content (up to 20), enabling smarter de-duplication and follow-up depth. The AI avoids repeating previously asked questions and builds on details from received answers.
+
+### Backend Changes
+
+- **BuildUserPromptAsync**: Extended to query `Questions` (via `QuestionSets`) and `QuestionResponses` (via `Drop.ContentDrop.Stuff`) for enriched prompt context
+- Long answers are truncated to 300 characters to manage token usage
+- History sections are omitted for new users with no question history
+
+### Tests Added
+
+- `GenerateSuggestions_WithPreviousQuestions_IncludesThemInPrompt`
+- `GenerateSuggestions_WithPreviousAnswers_IncludesThemInPrompt`
+- `GenerateSuggestions_WithNoPreviousHistory_StillGenerates`
+- **Total: 343 backend + 654 frontend = 997 tests passing**
+
+---
+
+## 2026-02-19: AI Question Suggestions (Phase 1)
+
+### New Feature
+
+**AI-Powered Question Suggestions**
+When creating a question set, users can now get AI-generated question suggestions to help them ask better, more meaningful questions. A collapsible "Need ideas?" panel lets users describe what they want to learn about and receive 5 suggested questions as tappable chips that auto-fill empty question fields.
+
+### Backend Changes
+
+- **AI Infrastructure**: Ports and adapters architecture with `IAiCompletionService` (port) and `XaiCompletionService` (adapter using xAI/Grok API)
+- **QuestionSuggestionService**: Generates suggestions with intent-based prompts, database-backed rate limiting (10/day per user), and prompt injection defense
+- **CacheEntry table**: New EF Core entity for distributed rate limiting with inline expired entry cleanup
+- **Controller endpoint**: `POST /api/questions/suggestions` with JWT auth and IP rate limiting
+- **Configuration**: `AiService` section in appsettings.json for provider/model/key/limits
+
+### Frontend Changes
+
+- **QuestionSuggestionPanel**: Collapsible panel with intent input, storyline picker, loading skeleton, and error handling
+- **SuggestionChip**: Tappable chip component with used/disabled states
+- **Session cache**: Avoids redundant AI calls for the same intent; Refresh button bypasses cache
+- **AskQuestionsView integration**: Panel appears in Step 1 (Create), auto-fills empty question fields
+
+### Tests Added
+
+- **Backend**: 12 QuestionSuggestionService tests + 5 XaiCompletionService tests = 17 new tests
+- **Frontend**: 5 SuggestionChip + 10 QuestionSuggestionPanel + 2 suggestionApi = 17 new tests
+- **Total: 340 backend + 654 frontend = 994 tests passing**
+
+---
+
 ## 2026-02-16: Email Link Fix
 
 ### Bug Fixes
