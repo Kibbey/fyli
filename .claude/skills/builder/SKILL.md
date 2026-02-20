@@ -50,8 +50,9 @@ This project uses **EF Core Code-First migrations** with **SQL Server** (not Pos
 2. Add FK and index configuration in `StreamContext.cs` → `OnModelCreating`
 3. Add `DbSet<T>` property to `StreamContext.cs`
 4. Generate migration: `cd cimplur-core/Memento && dotnet ef migrations add <Name>`
-5. Update `cimplur-core/docs/DATA_SCHEMA.md` with schema changes
-6. Run migrations to verify they work
+5. Generate SQL script for production: `cd cimplur-core/Memento && dotnet ef migrations script <PreviousMigration> <NewMigration> --project Domain --startup-project Memento --idempotent` and save to `docs/migrations/<Name>.sql`
+6. Update `cimplur-core/docs/DATA_SCHEMA.md` with schema changes
+7. Run migrations to verify they work
 
 **SQL Server Syntax Reminder:** When TDDs include raw SQL reference scripts, ensure they use SQL Server syntax:
 - `INT IDENTITY(1,1)` (not `SERIAL`), `DATETIME2` (not `TIMESTAMPTZ`), `BIT` (not `BOOLEAN`), `UNIQUEIDENTIFIER` (not `UUID`), `NVARCHAR` (not `VARCHAR` for Unicode), square brackets for identifiers

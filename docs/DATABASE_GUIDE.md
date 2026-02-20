@@ -148,3 +148,4 @@ The `StreamContext` defines 40+ DbSets. The core domain model is user-centric:
 | 20260206032422 | QuestionRequests (5 tables) |
 | 20260209005943 | AddExternalLogin |
 | 20260210222732 | AddTimelineShareLinks |
+| 20260219192308 | AddCacheEntry (AI suggestion rate limiting) |

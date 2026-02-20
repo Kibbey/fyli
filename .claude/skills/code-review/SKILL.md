@@ -26,6 +26,7 @@ All backend changes must be 100% backwards compatible for drops (memories) and a
 - [ ] Global error handling used (throw immediately, catch globally via middleware)
 - [ ] Jsonb column was not used.  Only use Jsonb if other alternatives are not available.
 - [ ] Database changes use EF Core Code-First pattern: POCO entity in `Entities/`, FK config in `StreamContext.OnModelCreating`, `DbSet<T>` property added, migration generated via `dotnet ef migrations add`. No raw SQL for schema changes.
+- [ ] Each EF Core migration has a corresponding `.sql` script in `docs/migrations/`, generated via `dotnet ef migrations script <PreviousMigration> <NewMigration> --project Domain --startup-project Memento --idempotent`. This script is used for production deployments.
 - [ ] Raw SQL scripts use **SQL Server syntax** (not PostgreSQL): `INT IDENTITY(1,1)` not `SERIAL`, `DATETIME2` not `TIMESTAMPTZ`, `BIT` not `BOOLEAN`, `UNIQUEIDENTIFIER` not `UUID`, `NVARCHAR` for Unicode, square brackets `[TableName]` not double quotes
 
 **Frontend (Vue.js):**
