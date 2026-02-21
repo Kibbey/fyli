@@ -43,28 +43,17 @@ FORMAT:
 - Example: ["What's a sound from your childhood that instantly takes you back?", ...]
 ```
 
-**User Prompt Template (Phase 2 — History-Enriched):**
+**User Prompt Template:**
 
 ```
 The user wants to learn about: {intent}
 
-PREVIOUSLY ASKED QUESTIONS (do NOT suggest similar questions):
-- {question1}
-- {question2}
-...
-
-RECENT ANSWERS RECEIVED (use these to suggest deeper follow-up questions):
-Q: {questionText}
-A: {answerContent, truncated to 300 chars}
-
 Generate 5 specific, storytelling-focused questions about this topic.
-Questions should build on details from previous answers when relevant.
-Never repeat or closely resemble previously asked questions.
 ```
 
-The PREVIOUSLY ASKED QUESTIONS section includes up to 50 most recent questions from the user's non-archived question sets. The RECENT ANSWERS section includes up to 20 most recent answered responses. Both sections are omitted when no history exists.
+When a storyline is selected, the prompt also includes storyline context (see below) and the instruction: "Use the storyline context to suggest questions that deepen the storyline's narrative."
 
-**Storyline Context (Phase 3):**
+**Storyline Context:**
 
 When a `storylineId` is provided, the prompt also includes:
 

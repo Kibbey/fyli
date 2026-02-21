@@ -1,5 +1,26 @@
 # Release Notes
 
+## 2026-02-20: Fix Question Suggestion Prompt Priority
+
+### Bug Fix
+
+**AI suggestions no longer influenced by old questions/answers**
+Previously, the AI prompt included up to 50 previous questions and 20 recent Q&A pairs, causing generated suggestions to "riff off" unrelated past history instead of focusing on the user's current intent. The prompt now uses only the user's intent (primary) and optional storyline context (secondary) to generate questions, producing more relevant and focused suggestions. This also reduces token usage per request.
+
+### Backend Changes
+
+- **BuildUserPromptAsync**: Removed previous questions query and recent answers query from prompt assembly
+- Removed "build on details from previous answers" and de-duplication instructions
+- Simplified final prompt instructions to focus on intent + storyline only
+
+### Tests Updated
+
+- `WithPreviousQuestions_DoesNotIncludeThemInPrompt`: Verifies questions in DB are excluded from prompt
+- `WithPreviousAnswers_DoesNotIncludeThemInPrompt`: Verifies answers in DB are excluded from prompt
+- **18 QuestionSuggestionService tests passing**
+
+---
+
 ## 2026-02-19: AI Question Suggestions (Phase 3 — Storyline Context)
 
 ### Enhancement

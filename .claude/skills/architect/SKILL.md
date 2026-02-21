@@ -1,7 +1,7 @@
 ---
 name: architect
 description: Design and plan software architecture for new features or refactoring. Use when asked to architect a solution, design a feature, create TDD, plan implementation, or make architectural decisions.
-allowed-tools: Read, Grep, Glob, Task
+allowed-tools: Read, Grep, Glob, Task, Skill
 ---
 
 # Architect Skill
@@ -238,7 +238,7 @@ What tests are needed and at what level.  Always add tests for both frontend and
 Recommended sequence for building the feature
 
 ### Review
-After creating the TDD call the /code-review skill to review the TDD and get feedback.  Display feedback to the user to decide if to address.
+After creating the TDD, use the Skill tool to invoke /code-review (e.g., `Skill: code-review`) to review the TDD and get feedback. Do NOT use the Task tool with subagent_type "code-review" — code-review is a skill, not a subagent type. Display feedback to the user to decide if to address.
 
 ### Archiving
 When a TDD is complete (all phases built and reviewed), move the corresponding PRD from `docs/prd/` to `docs/prd/archive/`.
