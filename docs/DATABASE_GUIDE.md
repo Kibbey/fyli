@@ -38,7 +38,7 @@ dotnet ef migrations script 20251207185045_transcode_update --idempotent --proje
 
 The `--idempotent` flag wraps each step in `IF NOT EXISTS` checks against `__EFMigrationsHistory`, making scripts safe to re-run.
 
-Save generated SQL to `docs/migrations/` and include it in the relevant TDD.
+Save generated SQL to `docs/migrations/` and update the relevant TDD post creation.
 
 ## Creating Schema Changes (EF Core Code-First)
 

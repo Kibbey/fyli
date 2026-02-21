@@ -108,13 +108,13 @@ public interface IUserRepository
 ```csharp
 public class AgendaService
 {
-    private readonly ICalendarRepository _calendarRepo;
-    private readonly ITodoRepository _todoRepo;
+    private readonly ICalendarRepository calendarRepo;
+    private readonly ITodoRepository todoRepo;
 
     public AgendaService(ICalendarRepository calendarRepo, ITodoRepository todoRepo)
     {
-        _calendarRepo = calendarRepo;
-        _todoRepo = todoRepo;
+        this.calendarRepo = calendarRepo;
+        this.todoRepo = todoRepo;
     }
 
     public async Task<Agenda> GenerateDailyAgendaAsync(string userId, DateTime date)
@@ -239,6 +239,9 @@ Recommended sequence for building the feature
 
 ### Review
 After creating the TDD call the /code-review skill to review the TDD and get feedback.  Display feedback to the user to decide if to address.
+
+### Archiving
+When a TDD is complete (all phases built and reviewed), move the corresponding PRD from `docs/prd/` to `docs/prd/archive/`.
 
 ## Project-Specific Considerations
 

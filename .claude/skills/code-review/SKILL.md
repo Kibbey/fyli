@@ -110,7 +110,7 @@ All backend changes must be 100% backwards compatible for drops (memories) and a
 - [ ] Double quotes
 - [ ] Semicolons used
 - [ ] Line length under 100 characters
-- [ ] **Backend (C#):** PascalCase for methods, properties, and public members; camelCase for local variables and parameters; `_camelCase` for private fields; PascalCase for classes and interfaces (prefix interfaces with `I`)
+- [ ] **Backend (C#):** PascalCase for methods, properties, and public members; camelCase for local variables, parameters, and private fields; PascalCase for classes and interfaces (prefix interfaces with `I`)
 - [ ] **Frontend:** camelCase for variables/functions; PascalCase for components
 - [ ] UPPER_CASE for constants
 
@@ -133,3 +133,7 @@ Optional enhancements and best practice recommendations
 
 ### Positive Notes
 Well-implemented patterns worth highlighting
+
+## Archiving
+
+When a TDD is fully complete (all phases built and code review passed), move the TDD from `docs/tdd/` to `docs/tdd/archive/`.

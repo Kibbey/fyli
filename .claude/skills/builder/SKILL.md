@@ -66,11 +66,11 @@ This project uses **EF Core Code-First migrations** with **SQL Server** (not Pos
 // Repository Pattern Example
 public class ExampleRepository : IExampleRepository
 {
-    private readonly AppDbContext _context;
+    private readonly AppDbContext context;
 
     public ExampleRepository(AppDbContext context)
     {
-        _context = context;
+        this.context = context;
     }
 
     public async Task<Example?> FindByIdAsync(string id)
@@ -98,11 +98,11 @@ Implement services following domain-driven design:
 // Service Pattern Example
 public class ExampleService
 {
-    private readonly IExampleRepository _exampleRepository;
+    private readonly IExampleRepository exampleRepository;
 
     public ExampleService(IExampleRepository exampleRepository)
     {
-        _exampleRepository = exampleRepository;
+        this.exampleRepository = exampleRepository;
     }
 
     public async Task<ExampleResult> ProcessExampleAsync(ExampleInput input)
@@ -128,11 +128,11 @@ Implement controllers:
 [Route("api/[controller]")]
 public class ExampleController : ControllerBase
 {
-    private readonly ExampleService _exampleService;
+    private readonly ExampleService exampleService;
 
     public ExampleController(ExampleService exampleService)
     {
-        _exampleService = exampleService;
+        this.exampleService = exampleService;
     }
 
     [HttpGet("{id}")]

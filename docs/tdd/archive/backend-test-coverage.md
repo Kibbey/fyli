@@ -193,8 +193,8 @@ namespace DomainTest.Repositories
     /// </summary>
     public abstract class BaseRepositoryTest
     {
-        protected StreamContext _context;
-        private IDbContextTransaction _transaction;
+        protected StreamContext context;
+        private IDbContextTransaction transaction;
 
         /// <summary>
         /// Creates a new database context for test operations.
@@ -216,8 +216,8 @@ namespace DomainTest.Repositories
         /// </summary>
         protected void InitializeWithTransaction()
         {
-            _context = CreateTestContext();
-            _transaction = _context.Database.BeginTransaction();
+            this.context = CreateTestContext();
+            this.transaction = context.Database.BeginTransaction();
         }
 
         /// <summary>
@@ -228,7 +228,7 @@ namespace DomainTest.Repositories
         {
             try
             {
-                _transaction?.Rollback();
+                transaction?.Rollback();
             }
             catch
             {
@@ -236,8 +236,8 @@ namespace DomainTest.Repositories
             }
             finally
             {
-                _transaction?.Dispose();
-                _context?.Dispose();
+                transaction?.Dispose();
+                context?.Dispose();
             }
         }
 
@@ -912,7 +912,7 @@ namespace DomainTest.Repositories
     [TestCategory("UserService")]
     public class UserServiceTest : BaseRepositoryTest
     {
-        private UserService _userService;
+        private UserService userService;
 
         [TestInitialize]
         public void Setup()
@@ -922,13 +922,13 @@ namespace DomainTest.Repositories
             Environment.SetEnvironmentVariable("DatabaseConnection", connectionString);
 
             InitializeWithTransaction();
-            _userService = TestServiceFactory.CreateUserService();
+            this.userService = TestServiceFactory.CreateUserService();
         }
 
         [TestCleanup]
         public void Cleanup()
         {
-            _userService?.Dispose();
+            userService?.Dispose();
             CleanupWithTransaction();
         }
 
@@ -942,7 +942,7 @@ namespace DomainTest.Repositories
             var userName = $"user_{Guid.NewGuid():N}";
 
             // Act
-            var userId = await _userService.AddUser(email, userName, null, true, "Test User", null);
+            var userId = await userService.AddUser(email, userName, null, true, "Test User", null);
 
             // Assert
             Assert.IsTrue(userId > 0);
@@ -964,11 +964,11 @@ namespace DomainTest.Repositories
         public async Task AddUser_WithExistingUserName_ShouldThrowBadRequestException()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            DetachAllEntities(context);
 
             // Act
-            await _userService.AddUser("new@test.com", user.UserName, null, true, "New User", null);
+            await userService.AddUser("new@test.com", user.UserName, null, true, "New User", null);
         }
 
         [TestMethod]
@@ -983,7 +983,7 @@ namespace DomainTest.Repositories
             };
 
             // Act
-            var userId = await _userService.AddUser(email, userName, null, true, "Test User", reasons);
+            var userId = await userService.AddUser(email, userName, null, true, "Test User", reasons);
 
             // Assert
             using (var verifyContext = CreateVerificationContext())
@@ -1002,7 +1002,7 @@ namespace DomainTest.Repositories
             var userName = $"user_{Guid.NewGuid():N}";
 
             // Act
-            var userId = await _userService.AddUser(email, userName, null, true, null, null);
+            var userId = await userService.AddUser(email, userName, null, true, null, null);
 
             // Assert
             using (var verifyContext = CreateVerificationContext())
@@ -1021,7 +1021,7 @@ namespace DomainTest.Repositories
             var userName = $"user_{Guid.NewGuid():N}";
 
             // Act
-            var userId = await _userService.AddUser(email, userName, null, false, "Test User", null);
+            var userId = await userService.AddUser(email, userName, null, false, "Test User", null);
 
             // Assert
             using (var verifyContext = CreateVerificationContext())
@@ -1040,11 +1040,11 @@ namespace DomainTest.Repositories
         public async Task GetUser_WithValidId_ShouldReturnUserModel()
         {
             // Arrange
-            var user = await CreateTestPremiumUser(_context, 30);
-            DetachAllEntities(_context);
+            var user = await CreateTestPremiumUser(context, 30);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _userService.GetUser(user.UserId);
+            var result = await userService.GetUser(user.UserId);
 
             // Assert
             Assert.IsNotNull(result);
@@ -1057,20 +1057,20 @@ namespace DomainTest.Repositories
         public async Task GetUser_WithInvalidId_ShouldThrowNotFoundException()
         {
             // Act
-            await _userService.GetUser(99999);
+            await userService.GetUser(99999);
         }
 
         [TestMethod]
         public async Task GetUser_WithExpiredPremium_ShouldReturnNonPremiumMember()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
+            var user = await CreateTestUser(context);
             user.PremiumExpiration = DateTime.UtcNow.AddDays(-1);
-            await _context.SaveChangesAsync();
-            DetachAllEntities(_context);
+            await context.SaveChangesAsync();
+            DetachAllEntities(context);
 
             // Act
-            var result = await _userService.GetUser(user.UserId);
+            var result = await userService.GetUser(user.UserId);
 
             // Assert
             Assert.IsFalse(result.PremiumMember);
@@ -1084,11 +1084,11 @@ namespace DomainTest.Repositories
         public async Task GetProfile_WithValidId_ShouldReturnProfileModel()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _userService.GetProfile(user.UserId);
+            var result = await userService.GetProfile(user.UserId);
 
             // Assert
             Assert.IsNotNull(result);
@@ -1101,7 +1101,7 @@ namespace DomainTest.Repositories
         public async Task GetProfile_WithInvalidId_ShouldThrowNotFoundException()
         {
             // Act
-            await _userService.GetProfile(99999);
+            await userService.GetProfile(99999);
         }
 
         #endregion
@@ -1112,11 +1112,11 @@ namespace DomainTest.Repositories
         public async Task ChangeName_WithValidName_ShouldUpdateName()
         {
             // Arrange
-            var user = await CreateTestUser(_context, name: "Original Name");
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context, name: "Original Name");
+            DetachAllEntities(context);
 
             // Act
-            var result = await _userService.ChangeName(user.UserId, "New Name");
+            var result = await userService.ChangeName(user.UserId, "New Name");
 
             // Assert
             Assert.AreEqual("New Name", result.Name);
@@ -1132,11 +1132,11 @@ namespace DomainTest.Repositories
         public async Task ChangeName_WithEmptyName_ShouldUseUserName()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _userService.ChangeName(user.UserId, "");
+            var result = await userService.ChangeName(user.UserId, "");
 
             // Assert
             Assert.AreEqual(user.UserName, result.Name);
@@ -1146,11 +1146,11 @@ namespace DomainTest.Repositories
         public async Task ChangeName_WithWhitespace_ShouldUseUserName()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _userService.ChangeName(user.UserId, "   ");
+            var result = await userService.ChangeName(user.UserId, "   ");
 
             // Assert
             Assert.AreEqual(user.UserName, result.Name);
@@ -1161,7 +1161,7 @@ namespace DomainTest.Repositories
         public async Task ChangeName_WithInvalidUserId_ShouldThrowNotFoundException()
         {
             // Act
-            await _userService.ChangeName(99999, "New Name");
+            await userService.ChangeName(99999, "New Name");
         }
 
         #endregion
@@ -1172,13 +1172,13 @@ namespace DomainTest.Repositories
         public async Task GetConnections_WithConnections_ShouldReturnList()
         {
             // Arrange
-            var owner = await CreateTestUser(_context, name: "Owner");
-            var reader = await CreateTestUser(_context, name: "Reader");
-            await CreateTestConnection(_context, owner.UserId, reader.UserId);
-            DetachAllEntities(_context);
+            var owner = await CreateTestUser(context, name: "Owner");
+            var reader = await CreateTestUser(context, name: "Reader");
+            await CreateTestConnection(context, owner.UserId, reader.UserId);
+            DetachAllEntities(context);
 
             // Act
-            var result = _userService.GetConnections(owner.UserId);
+            var result = userService.GetConnections(owner.UserId);
 
             // Assert
             Assert.IsTrue(result.Count > 0);
@@ -1189,11 +1189,11 @@ namespace DomainTest.Repositories
         public async Task GetConnections_WithNoConnections_ShouldReturnEmptyList()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            DetachAllEntities(context);
 
             // Act
-            var result = _userService.GetConnections(user.UserId);
+            var result = userService.GetConnections(user.UserId);
 
             // Assert
             Assert.AreEqual(0, result.Count);
@@ -1203,15 +1203,15 @@ namespace DomainTest.Repositories
         public async Task GetConnections_ShouldReturnOrderedByName()
         {
             // Arrange
-            var owner = await CreateTestUser(_context);
-            var readerA = await CreateTestUser(_context, name: "Zebra");
-            var readerB = await CreateTestUser(_context, name: "Apple");
-            await CreateTestConnection(_context, owner.UserId, readerA.UserId);
-            await CreateTestConnection(_context, owner.UserId, readerB.UserId);
-            DetachAllEntities(_context);
+            var owner = await CreateTestUser(context);
+            var readerA = await CreateTestUser(context, name: "Zebra");
+            var readerB = await CreateTestUser(context, name: "Apple");
+            await CreateTestConnection(context, owner.UserId, readerA.UserId);
+            await CreateTestConnection(context, owner.UserId, readerB.UserId);
+            DetachAllEntities(context);
 
             // Act
-            var result = _userService.GetConnections(owner.UserId);
+            var result = userService.GetConnections(owner.UserId);
 
             // Assert
             Assert.AreEqual(2, result.Count);
@@ -1227,13 +1227,13 @@ namespace DomainTest.Repositories
         public async Task UpdatePrivateMode_ToTrue_ShouldEnablePrivateMode()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
+            var user = await CreateTestUser(context);
             user.PrivateMode = false;
-            await _context.SaveChangesAsync();
-            DetachAllEntities(_context);
+            await context.SaveChangesAsync();
+            DetachAllEntities(context);
 
             // Act
-            var result = await _userService.UpdatePrivateMode(user.UserId, true);
+            var result = await userService.UpdatePrivateMode(user.UserId, true);
 
             // Assert
             Assert.IsTrue(result.PrivateMode);
@@ -1243,13 +1243,13 @@ namespace DomainTest.Repositories
         public async Task UpdatePrivateMode_ToFalse_ShouldDisablePrivateMode()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
+            var user = await CreateTestUser(context);
             user.PrivateMode = true;
-            await _context.SaveChangesAsync();
-            DetachAllEntities(_context);
+            await context.SaveChangesAsync();
+            DetachAllEntities(context);
 
             // Act
-            var result = await _userService.UpdatePrivateMode(user.UserId, false);
+            var result = await userService.UpdatePrivateMode(user.UserId, false);
 
             // Assert
             Assert.IsFalse(result.PrivateMode);
@@ -1260,7 +1260,7 @@ namespace DomainTest.Repositories
         public async Task UpdatePrivateMode_WithInvalidUserId_ShouldThrowNotFoundException()
         {
             // Act
-            await _userService.UpdatePrivateMode(99999, true);
+            await userService.UpdatePrivateMode(99999, true);
         }
 
         #endregion
@@ -1271,11 +1271,11 @@ namespace DomainTest.Repositories
         public async Task CheckEmail_WithExistingEmail_ShouldReturnTrue()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            DetachAllEntities(context);
 
             // Act
-            var result = _userService.CheckEmail(user.Email);
+            var result = userService.CheckEmail(user.Email);
 
             // Assert
             Assert.IsTrue(result);
@@ -1285,7 +1285,7 @@ namespace DomainTest.Repositories
         public void CheckEmail_WithNonExistingEmail_ShouldReturnFalse()
         {
             // Act
-            var result = _userService.CheckEmail($"nonexistent_{Guid.NewGuid():N}@test.com");
+            var result = userService.CheckEmail($"nonexistent_{Guid.NewGuid():N}@test.com");
 
             // Assert
             Assert.IsFalse(result);
@@ -1295,11 +1295,11 @@ namespace DomainTest.Repositories
         public async Task CheckEmail_WithExactMatch_ShouldReturnTrue()
         {
             // Arrange
-            var user = await CreateTestUser(_context, email: "TestUser@test.com");
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context, email: "TestUser@test.com");
+            DetachAllEntities(context);
 
             // Act
-            var result = _userService.CheckEmail("TestUser@test.com");
+            var result = userService.CheckEmail("TestUser@test.com");
 
             // Assert
             Assert.IsTrue(result);
@@ -1313,13 +1313,13 @@ namespace DomainTest.Repositories
         public async Task IgnoreConnectionRequest_WithValidRequest_ShouldMarkAsIgnored()
         {
             // Arrange
-            var requester = await CreateTestUser(_context);
-            var target = await CreateTestUser(_context);
-            var request = await CreateTestShareRequest(_context, requester.UserId, target.UserId);
-            DetachAllEntities(_context);
+            var requester = await CreateTestUser(context);
+            var target = await CreateTestUser(context);
+            var request = await CreateTestShareRequest(context, requester.UserId, target.UserId);
+            DetachAllEntities(context);
 
             // Act
-            _userService.IgnoreConnectionRequest(target.UserId, requester.Email);
+            userService.IgnoreConnectionRequest(target.UserId, requester.Email);
 
             // Assert
             using (var verifyContext = CreateVerificationContext())
@@ -1333,11 +1333,11 @@ namespace DomainTest.Repositories
         public async Task IgnoreConnectionRequest_WithNonExistentRequester_ShouldNotThrow()
         {
             // Arrange
-            var target = await CreateTestUser(_context);
-            DetachAllEntities(_context);
+            var target = await CreateTestUser(context);
+            DetachAllEntities(context);
 
             // Act - Should not throw
-            _userService.IgnoreConnectionRequest(target.UserId, "nonexistent@test.com");
+            userService.IgnoreConnectionRequest(target.UserId, "nonexistent@test.com");
 
             // Assert - No exception thrown
         }
@@ -1350,11 +1350,11 @@ namespace DomainTest.Repositories
         public async Task GetRelationships_ShouldReturnAllRelationshipTypes()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _userService.GetRelationships(user.UserId);
+            var result = await userService.GetRelationships(user.UserId);
 
             // Assert
             Assert.IsTrue(result.Count > 0);
@@ -1364,12 +1364,12 @@ namespace DomainTest.Repositories
         public async Task UpdateRelationships_ShouldAddSelectedRelationships()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            DetachAllEntities(context);
 
             // Act
             var selected = new List<int> { 1, 2 };
-            var result = await _userService.UpdateRelationships(selected, user.UserId);
+            var result = await userService.UpdateRelationships(selected, user.UserId);
 
             // Assert
             Assert.IsTrue(result.Exists(r => r.Id == 1 && r.Selected));
@@ -1380,12 +1380,12 @@ namespace DomainTest.Repositories
         public async Task UpdateRelationships_WithEmptyList_ShouldRemoveAllRelationships()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            await _userService.UpdateRelationships(new List<int> { 1 }, user.UserId);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            await userService.UpdateRelationships(new List<int> { 1 }, user.UserId);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _userService.UpdateRelationships(new List<int>(), user.UserId);
+            var result = await userService.UpdateRelationships(new List<int>(), user.UserId);
 
             // Assert
             Assert.IsFalse(result.Exists(r => r.Selected));
@@ -1419,7 +1419,7 @@ namespace DomainTest.Repositories
     [TestCategory("SharingService")]
     public class SharingServiceTest : BaseRepositoryTest
     {
-        private SharingService _sharingService;
+        private SharingService sharingService;
 
         [TestInitialize]
         public void Setup()
@@ -1429,13 +1429,13 @@ namespace DomainTest.Repositories
             Environment.SetEnvironmentVariable("DatabaseConnection", connectionString);
 
             InitializeWithTransaction();
-            _sharingService = TestServiceFactory.CreateSharingService();
+            this.sharingService = TestServiceFactory.CreateSharingService();
         }
 
         [TestCleanup]
         public void Cleanup()
         {
-            _sharingService?.Dispose();
+            sharingService?.Dispose();
             CleanupWithTransaction();
         }
 
@@ -1445,15 +1445,15 @@ namespace DomainTest.Repositories
         public async Task GetConnectionRequests_WithPendingRequest_ShouldReturnRequests()
         {
             // Arrange
-            var requester = await CreateTestUser(_context, name: "Requester");
-            var target = await CreateTestUser(_context, name: "Target");
-            var request = await CreateTestShareRequest(_context, requester.UserId, target.UserId);
+            var requester = await CreateTestUser(context, name: "Requester");
+            var target = await CreateTestUser(context, name: "Target");
+            var request = await CreateTestShareRequest(context, requester.UserId, target.UserId);
             request.RequestorName = "Requester";
-            await _context.SaveChangesAsync();
-            DetachAllEntities(_context);
+            await context.SaveChangesAsync();
+            DetachAllEntities(context);
 
             // Act
-            var result = _sharingService.GetConnectionRequests(target.UserId);
+            var result = sharingService.GetConnectionRequests(target.UserId);
 
             // Assert
             Assert.IsTrue(result.Any());
@@ -1463,11 +1463,11 @@ namespace DomainTest.Repositories
         public async Task GetConnectionRequests_WithNoRequests_ShouldReturnEmptyList()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            DetachAllEntities(context);
 
             // Act
-            var result = _sharingService.GetConnectionRequests(user.UserId);
+            var result = sharingService.GetConnectionRequests(user.UserId);
 
             // Assert
             Assert.AreEqual(0, result.Count);
@@ -1477,15 +1477,15 @@ namespace DomainTest.Repositories
         public async Task GetConnectionRequests_WithIgnoredRequest_ShouldNotReturnIgnored()
         {
             // Arrange
-            var requester = await CreateTestUser(_context);
-            var target = await CreateTestUser(_context);
-            var request = await CreateTestShareRequest(_context, requester.UserId, target.UserId);
+            var requester = await CreateTestUser(context);
+            var target = await CreateTestUser(context);
+            var request = await CreateTestShareRequest(context, requester.UserId, target.UserId);
             request.Ignored = true;
-            await _context.SaveChangesAsync();
-            DetachAllEntities(_context);
+            await context.SaveChangesAsync();
+            DetachAllEntities(context);
 
             // Act
-            var result = _sharingService.GetConnectionRequests(target.UserId);
+            var result = sharingService.GetConnectionRequests(target.UserId);
 
             // Assert
             Assert.AreEqual(0, result.Count);
@@ -1495,15 +1495,15 @@ namespace DomainTest.Repositories
         public async Task GetConnectionRequests_WithUsedRequest_ShouldNotReturnUsed()
         {
             // Arrange
-            var requester = await CreateTestUser(_context);
-            var target = await CreateTestUser(_context);
-            var request = await CreateTestShareRequest(_context, requester.UserId, target.UserId);
+            var requester = await CreateTestUser(context);
+            var target = await CreateTestUser(context);
+            var request = await CreateTestShareRequest(context, requester.UserId, target.UserId);
             request.Used = true;
-            await _context.SaveChangesAsync();
-            DetachAllEntities(_context);
+            await context.SaveChangesAsync();
+            DetachAllEntities(context);
 
             // Act
-            var result = _sharingService.GetConnectionRequests(target.UserId);
+            var result = sharingService.GetConnectionRequests(target.UserId);
 
             // Assert
             Assert.AreEqual(0, result.Count);
@@ -1517,11 +1517,11 @@ namespace DomainTest.Repositories
         public async Task GetSuggestions_ForNewUser_ShouldReturnEmpty()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _sharingService.GetSuggestions(user.UserId);
+            var result = await sharingService.GetSuggestions(user.UserId);
 
             // Assert
             Assert.AreEqual(0, result.Count);
@@ -1535,13 +1535,13 @@ namespace DomainTest.Repositories
         public async Task RemoveConnection_ShouldRemoveConnection()
         {
             // Arrange
-            var owner = await CreateTestUser(_context);
-            var reader = await CreateTestUser(_context);
-            var connection = await CreateTestConnection(_context, owner.UserId, reader.UserId);
-            DetachAllEntities(_context);
+            var owner = await CreateTestUser(context);
+            var reader = await CreateTestUser(context);
+            var connection = await CreateTestConnection(context, owner.UserId, reader.UserId);
+            DetachAllEntities(context);
 
             // Act
-            _sharingService.RemoveConnection(owner.UserId, reader.UserId);
+            sharingService.RemoveConnection(owner.UserId, reader.UserId);
 
             // Assert
             using (var verifyContext = CreateVerificationContext())
@@ -1556,12 +1556,12 @@ namespace DomainTest.Repositories
         public async Task RemoveConnection_WithNonExistentConnection_ShouldNotThrow()
         {
             // Arrange
-            var owner = await CreateTestUser(_context);
-            var reader = await CreateTestUser(_context);
-            DetachAllEntities(_context);
+            var owner = await CreateTestUser(context);
+            var reader = await CreateTestUser(context);
+            DetachAllEntities(context);
 
             // Act - Should not throw
-            _sharingService.RemoveConnection(owner.UserId, reader.UserId);
+            sharingService.RemoveConnection(owner.UserId, reader.UserId);
         }
 
         #endregion
@@ -1572,13 +1572,13 @@ namespace DomainTest.Repositories
         public async Task IgnoreRequest_WithValidToken_ShouldMarkAsUsed()
         {
             // Arrange
-            var requester = await CreateTestUser(_context);
-            var target = await CreateTestUser(_context);
-            var request = await CreateTestShareRequest(_context, requester.UserId, target.UserId);
-            DetachAllEntities(_context);
+            var requester = await CreateTestUser(context);
+            var target = await CreateTestUser(context);
+            var request = await CreateTestShareRequest(context, requester.UserId, target.UserId);
+            DetachAllEntities(context);
 
             // Act
-            await _sharingService.IgnoreRequest(request.RequestKey.ToString(), target.UserId);
+            await sharingService.IgnoreRequest(request.RequestKey.ToString(), target.UserId);
 
             // Assert
             using (var verifyContext = CreateVerificationContext())
@@ -1596,17 +1596,17 @@ namespace DomainTest.Repositories
         public async Task RequestConnection_WithValidData_ShouldCreateShareRequest()
         {
             // Arrange
-            var requester = await CreateTestUser(_context, name: "Requester");
+            var requester = await CreateTestUser(context, name: "Requester");
             var model = new ConnectionRequestModel
             {
                 Email = $"target_{Guid.NewGuid():N}@test.com",
                 RequestorName = "Requester",
                 ContactName = "Target"
             };
-            DetachAllEntities(_context);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _sharingService.RequestConnection(requester.UserId, model);
+            var result = await sharingService.RequestConnection(requester.UserId, model);
 
             // Assert
             Assert.IsTrue(result.Success);
@@ -1616,17 +1616,17 @@ namespace DomainTest.Repositories
         public async Task RequestConnection_ToSelf_ShouldFail()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
+            var user = await CreateTestUser(context);
             var model = new ConnectionRequestModel
             {
                 Email = user.Email,
                 RequestorName = user.Name,
                 ContactName = user.Name
             };
-            DetachAllEntities(_context);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _sharingService.RequestConnection(user.UserId, model);
+            var result = await sharingService.RequestConnection(user.UserId, model);
 
             // Assert
             Assert.IsFalse(result.Success);
@@ -1636,19 +1636,19 @@ namespace DomainTest.Repositories
         public async Task RequestConnection_ToExistingConnection_ShouldReturnAlreadyConnected()
         {
             // Arrange
-            var owner = await CreateTestUser(_context, name: "Owner");
-            var reader = await CreateTestUser(_context, name: "Reader");
-            await CreateTestConnection(_context, owner.UserId, reader.UserId);
+            var owner = await CreateTestUser(context, name: "Owner");
+            var reader = await CreateTestUser(context, name: "Reader");
+            await CreateTestConnection(context, owner.UserId, reader.UserId);
             var model = new ConnectionRequestModel
             {
                 Email = reader.Email,
                 RequestorName = "Owner",
                 ContactName = "Reader"
             };
-            DetachAllEntities(_context);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _sharingService.RequestConnection(owner.UserId, model);
+            var result = await sharingService.RequestConnection(owner.UserId, model);
 
             // Assert
             Assert.IsFalse(result.Success);
@@ -1662,14 +1662,14 @@ namespace DomainTest.Repositories
         public async Task GetConnectionRequests_AsWrongUser_ShouldReturnEmpty()
         {
             // Arrange
-            var requester = await CreateTestUser(_context);
-            var target = await CreateTestUser(_context);
-            var other = await CreateTestUser(_context);
-            await CreateTestShareRequest(_context, requester.UserId, target.UserId);
-            DetachAllEntities(_context);
+            var requester = await CreateTestUser(context);
+            var target = await CreateTestUser(context);
+            var other = await CreateTestUser(context);
+            await CreateTestShareRequest(context, requester.UserId, target.UserId);
+            DetachAllEntities(context);
 
             // Act - Other user should not see target's requests
-            var result = _sharingService.GetConnectionRequests(other.UserId);
+            var result = sharingService.GetConnectionRequests(other.UserId);
 
             // Assert
             Assert.AreEqual(0, result.Count);
@@ -1706,7 +1706,7 @@ namespace DomainTest.Repositories
     [TestCategory("GroupService")]
     public class GroupServiceTest : BaseRepositoryTest
     {
-        private GroupService _groupService;
+        private GroupService groupService;
 
         [TestInitialize]
         public void Setup()
@@ -1716,13 +1716,13 @@ namespace DomainTest.Repositories
             Environment.SetEnvironmentVariable("DatabaseConnection", connectionString);
 
             InitializeWithTransaction();
-            _groupService = TestServiceFactory.CreateGroupService();
+            this.groupService = TestServiceFactory.CreateGroupService();
         }
 
         [TestCleanup]
         public void Cleanup()
         {
-            _groupService?.Dispose();
+            groupService?.Dispose();
             CleanupWithTransaction();
         }
 
@@ -1732,12 +1732,12 @@ namespace DomainTest.Repositories
         public async Task AllGroups_WithGroups_ShouldReturnGroupList()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var group = await CreateTestGroup(_context, user.UserId, "Test Group");
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            var group = await CreateTestGroup(context, user.UserId, "Test Group");
+            DetachAllEntities(context);
 
             // Act
-            var result = await _groupService.AllGroups(user.UserId);
+            var result = await groupService.AllGroups(user.UserId);
 
             // Assert
             Assert.IsTrue(result.Any(g => g.Name == "Test Group"));
@@ -1747,11 +1747,11 @@ namespace DomainTest.Repositories
         public async Task AllGroups_WithNoGroups_ShouldReturnEmptyList()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _groupService.AllGroups(user.UserId);
+            var result = await groupService.AllGroups(user.UserId);
 
             // Assert
             Assert.AreEqual(0, result.Count);
@@ -1761,14 +1761,14 @@ namespace DomainTest.Repositories
         public async Task AllGroups_ShouldNotReturnOtherUsersGroups()
         {
             // Arrange
-            var user1 = await CreateTestUser(_context);
-            var user2 = await CreateTestUser(_context);
-            await CreateTestGroup(_context, user1.UserId, "User1 Group");
-            await CreateTestGroup(_context, user2.UserId, "User2 Group");
-            DetachAllEntities(_context);
+            var user1 = await CreateTestUser(context);
+            var user2 = await CreateTestUser(context);
+            await CreateTestGroup(context, user1.UserId, "User1 Group");
+            await CreateTestGroup(context, user2.UserId, "User2 Group");
+            DetachAllEntities(context);
 
             // Act
-            var result = await _groupService.AllGroups(user1.UserId);
+            var result = await groupService.AllGroups(user1.UserId);
 
             // Assert
             Assert.IsTrue(result.All(g => g.Name != "User2 Group"));
@@ -1782,11 +1782,11 @@ namespace DomainTest.Repositories
         public async Task Add_WithValidName_ShouldCreateGroup()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            DetachAllEntities(context);
 
             // Act
-            var groupId = _groupService.Add("New Group", user.UserId);
+            var groupId = groupService.Add("New Group", user.UserId);
 
             // Assert
             Assert.IsTrue(groupId > 0);
@@ -1803,12 +1803,12 @@ namespace DomainTest.Repositories
         public async Task Add_WithExistingName_ShouldReturnExistingId()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var existingGroup = await CreateTestGroup(_context, user.UserId, "Existing Group");
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            var existingGroup = await CreateTestGroup(context, user.UserId, "Existing Group");
+            DetachAllEntities(context);
 
             // Act
-            var groupId = _groupService.Add("Existing Group", user.UserId);
+            var groupId = groupService.Add("Existing Group", user.UserId);
 
             // Assert
             Assert.AreEqual(existingGroup.UserTagId, groupId);
@@ -1819,7 +1819,7 @@ namespace DomainTest.Repositories
         public void Add_WithNullName_ShouldThrowBadRequestException()
         {
             // Act
-            _groupService.Add(null, 1);
+            groupService.Add(null, 1);
         }
 
         [TestMethod]
@@ -1827,7 +1827,7 @@ namespace DomainTest.Repositories
         public void Add_WithEmptyName_ShouldThrowBadRequestException()
         {
             // Act
-            _groupService.Add("", 1);
+            groupService.Add("", 1);
         }
 
         [TestMethod]
@@ -1835,7 +1835,7 @@ namespace DomainTest.Repositories
         public void Add_WithWhitespaceName_ShouldThrowBadRequestException()
         {
             // Act
-            _groupService.Add("   ", 1);
+            groupService.Add("   ", 1);
         }
 
         [TestMethod]
@@ -1846,7 +1846,7 @@ namespace DomainTest.Repositories
             var longName = new string('a', 51);
 
             // Act
-            _groupService.Add(longName, 1);
+            groupService.Add(longName, 1);
         }
 
         [TestMethod]
@@ -1854,11 +1854,11 @@ namespace DomainTest.Repositories
         public async Task Add_WithEveryoneName_ShouldThrowBadRequestException()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            DetachAllEntities(context);
 
             // Act - "everyone" is reserved
-            _groupService.Add("everyone", user.UserId);
+            groupService.Add("everyone", user.UserId);
         }
 
         #endregion
@@ -1869,14 +1869,14 @@ namespace DomainTest.Repositories
         public async Task UpdateNetworkViewers_ShouldAddViewers()
         {
             // Arrange
-            var owner = await CreateTestUser(_context);
-            var member = await CreateTestUser(_context);
-            await CreateTestConnection(_context, owner.UserId, member.UserId);
-            var group = await CreateTestGroup(_context, owner.UserId, "Family");
-            DetachAllEntities(_context);
+            var owner = await CreateTestUser(context);
+            var member = await CreateTestUser(context);
+            await CreateTestConnection(context, owner.UserId, member.UserId);
+            var group = await CreateTestGroup(context, owner.UserId, "Family");
+            DetachAllEntities(context);
 
             // Act
-            var result = await _groupService.UpdateNetworkViewers(owner.UserId, group.UserTagId, new List<int> { member.UserId });
+            var result = await groupService.UpdateNetworkViewers(owner.UserId, group.UserTagId, new List<int> { member.UserId });
 
             // Assert
             Assert.IsNotNull(result);
@@ -1893,14 +1893,14 @@ namespace DomainTest.Repositories
         public async Task UpdateNetworkViewers_WithEmptyList_ShouldRemoveAllViewers()
         {
             // Arrange
-            var owner = await CreateTestUser(_context);
-            var member = await CreateTestUser(_context);
-            var group = await CreateTestGroup(_context, owner.UserId, "Friends");
-            await AddViewerToGroup(_context, group.UserTagId, member.UserId);
-            DetachAllEntities(_context);
+            var owner = await CreateTestUser(context);
+            var member = await CreateTestUser(context);
+            var group = await CreateTestGroup(context, owner.UserId, "Friends");
+            await AddViewerToGroup(context, group.UserTagId, member.UserId);
+            DetachAllEntities(context);
 
             // Act
-            await _groupService.UpdateNetworkViewers(owner.UserId, group.UserTagId, new List<int>());
+            await groupService.UpdateNetworkViewers(owner.UserId, group.UserTagId, new List<int>());
 
             // Assert
             using (var verifyContext = CreateVerificationContext())
@@ -1920,12 +1920,12 @@ namespace DomainTest.Repositories
         public async Task Rename_WithValidName_ShouldUpdateName()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var group = await CreateTestGroup(_context, user.UserId, "Old Name");
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            var group = await CreateTestGroup(context, user.UserId, "Old Name");
+            DetachAllEntities(context);
 
             // Act
-            var result = await _groupService.Rename(user.UserId, (int)group.UserTagId, "New Name");
+            var result = await groupService.Rename(user.UserId, (int)group.UserTagId, "New Name");
 
             // Assert
             Assert.AreEqual("New Name", result);
@@ -1945,12 +1945,12 @@ namespace DomainTest.Repositories
         public async Task Archive_ShouldArchiveGroup()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var group = await CreateTestGroup(_context, user.UserId, "To Archive");
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            var group = await CreateTestGroup(context, user.UserId, "To Archive");
+            DetachAllEntities(context);
 
             // Act
-            await _groupService.Archive(group.UserTagId, user.UserId);
+            await groupService.Archive(group.UserTagId, user.UserId);
 
             // Assert
             using (var verifyContext = CreateVerificationContext())
@@ -1968,13 +1968,13 @@ namespace DomainTest.Repositories
         public async Task AllGroups_ForDifferentUser_ShouldNotReturnOthersGroups()
         {
             // Arrange
-            var owner = await CreateTestUser(_context);
-            var other = await CreateTestUser(_context);
-            await CreateTestGroup(_context, owner.UserId, "Owner's Group");
-            DetachAllEntities(_context);
+            var owner = await CreateTestUser(context);
+            var other = await CreateTestUser(context);
+            await CreateTestGroup(context, owner.UserId, "Owner's Group");
+            DetachAllEntities(context);
 
             // Act
-            var result = await _groupService.AllGroups(other.UserId);
+            var result = await groupService.AllGroups(other.UserId);
 
             // Assert
             Assert.IsFalse(result.Any(g => g.Name == "Owner's Group"));
@@ -2006,7 +2006,7 @@ namespace DomainTest.Repositories
     [TestCategory("NotificationService")]
     public class NotificationServiceTest : BaseRepositoryTest
     {
-        private NotificationService _notificationService;
+        private NotificationService notificationService;
 
         [TestInitialize]
         public void Setup()
@@ -2016,13 +2016,13 @@ namespace DomainTest.Repositories
             Environment.SetEnvironmentVariable("DatabaseConnection", connectionString);
 
             InitializeWithTransaction();
-            _notificationService = TestServiceFactory.CreateNotificationService();
+            this.notificationService = TestServiceFactory.CreateNotificationService();
         }
 
         [TestCleanup]
         public void Cleanup()
         {
-            _notificationService?.Dispose();
+            notificationService?.Dispose();
             CleanupWithTransaction();
         }
 
@@ -2032,14 +2032,14 @@ namespace DomainTest.Repositories
         public async Task Notifications_WithNotifications_ShouldReturnModel()
         {
             // Arrange
-            var owner = await CreateTestUser(_context);
-            var target = await CreateTestUser(_context);
-            var drop = await CreateTestDrop(_context, owner.UserId);
-            await CreateTestNotification(_context, target.UserId, drop.DropId, owner.UserId);
-            DetachAllEntities(_context);
+            var owner = await CreateTestUser(context);
+            var target = await CreateTestUser(context);
+            var drop = await CreateTestDrop(context, owner.UserId);
+            await CreateTestNotification(context, target.UserId, drop.DropId, owner.UserId);
+            DetachAllEntities(context);
 
             // Act
-            var result = _notificationService.Notifications(target.UserId);
+            var result = notificationService.Notifications(target.UserId);
 
             // Assert
             Assert.IsNotNull(result);
@@ -2049,11 +2049,11 @@ namespace DomainTest.Repositories
         public async Task Notifications_WithNoNotifications_ShouldReturnEmptyModel()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            DetachAllEntities(context);
 
             // Act
-            var result = _notificationService.Notifications(user.UserId);
+            var result = notificationService.Notifications(user.UserId);
 
             // Assert
             Assert.IsNotNull(result);
@@ -2067,14 +2067,14 @@ namespace DomainTest.Repositories
         public async Task ViewNotification_ShouldMarkAsViewed()
         {
             // Arrange
-            var owner = await CreateTestUser(_context);
-            var target = await CreateTestUser(_context);
-            var drop = await CreateTestDrop(_context, owner.UserId);
-            await CreateTestUserDrop(_context, target.UserId, drop.DropId, viewed: false);
-            DetachAllEntities(_context);
+            var owner = await CreateTestUser(context);
+            var target = await CreateTestUser(context);
+            var drop = await CreateTestDrop(context, owner.UserId);
+            await CreateTestUserDrop(context, target.UserId, drop.DropId, viewed: false);
+            DetachAllEntities(context);
 
             // Act
-            _notificationService.ViewNotification(target.UserId, drop.DropId);
+            notificationService.ViewNotification(target.UserId, drop.DropId);
 
             // Assert
             using (var verifyContext = CreateVerificationContext())
@@ -2089,13 +2089,13 @@ namespace DomainTest.Repositories
         public async Task ViewNotification_WithNoUserDrop_ShouldNotThrow()
         {
             // Arrange
-            var owner = await CreateTestUser(_context);
-            var target = await CreateTestUser(_context);
-            var drop = await CreateTestDrop(_context, owner.UserId);
-            DetachAllEntities(_context);
+            var owner = await CreateTestUser(context);
+            var target = await CreateTestUser(context);
+            var drop = await CreateTestDrop(context, owner.UserId);
+            DetachAllEntities(context);
 
             // Act - Should not throw even without UserDrop record
-            _notificationService.ViewNotification(target.UserId, drop.DropId);
+            notificationService.ViewNotification(target.UserId, drop.DropId);
         }
 
         #endregion
@@ -2106,16 +2106,16 @@ namespace DomainTest.Repositories
         public async Task RemoveAllNotifications_ShouldRemoveAll()
         {
             // Arrange
-            var owner = await CreateTestUser(_context);
-            var target = await CreateTestUser(_context);
-            var drop1 = await CreateTestDrop(_context, owner.UserId);
-            var drop2 = await CreateTestDrop(_context, owner.UserId);
-            await CreateTestNotification(_context, target.UserId, drop1.DropId, owner.UserId);
-            await CreateTestNotification(_context, target.UserId, drop2.DropId, owner.UserId);
-            DetachAllEntities(_context);
+            var owner = await CreateTestUser(context);
+            var target = await CreateTestUser(context);
+            var drop1 = await CreateTestDrop(context, owner.UserId);
+            var drop2 = await CreateTestDrop(context, owner.UserId);
+            await CreateTestNotification(context, target.UserId, drop1.DropId, owner.UserId);
+            await CreateTestNotification(context, target.UserId, drop2.DropId, owner.UserId);
+            DetachAllEntities(context);
 
             // Act
-            _notificationService.RemoveAllNotifications(target.UserId);
+            notificationService.RemoveAllNotifications(target.UserId);
 
             // Assert
             using (var verifyContext = CreateVerificationContext())
@@ -2135,15 +2135,15 @@ namespace DomainTest.Repositories
         public async Task Notifications_OnlyReturnsOwnNotifications()
         {
             // Arrange
-            var owner = await CreateTestUser(_context);
-            var target1 = await CreateTestUser(_context);
-            var target2 = await CreateTestUser(_context);
-            var drop = await CreateTestDrop(_context, owner.UserId);
-            await CreateTestNotification(_context, target1.UserId, drop.DropId, owner.UserId);
-            DetachAllEntities(_context);
+            var owner = await CreateTestUser(context);
+            var target1 = await CreateTestUser(context);
+            var target2 = await CreateTestUser(context);
+            var drop = await CreateTestDrop(context, owner.UserId);
+            await CreateTestNotification(context, target1.UserId, drop.DropId, owner.UserId);
+            DetachAllEntities(context);
 
             // Act
-            var result = _notificationService.Notifications(target2.UserId);
+            var result = notificationService.Notifications(target2.UserId);
 
             // Assert - target2 should not see target1's notifications
             Assert.IsNotNull(result);
@@ -2175,7 +2175,7 @@ namespace DomainTest.Repositories
     [TestCategory("TimelineService")]
     public class TimelineServiceTest : BaseRepositoryTest
     {
-        private TimelineService _timelineService;
+        private TimelineService timelineService;
 
         [TestInitialize]
         public void Setup()
@@ -2185,13 +2185,13 @@ namespace DomainTest.Repositories
             Environment.SetEnvironmentVariable("DatabaseConnection", connectionString);
 
             InitializeWithTransaction();
-            _timelineService = TestServiceFactory.CreateTimelineService();
+            this.timelineService = TestServiceFactory.CreateTimelineService();
         }
 
         [TestCleanup]
         public void Cleanup()
         {
-            _timelineService?.Dispose();
+            timelineService?.Dispose();
             CleanupWithTransaction();
         }
 
@@ -2201,12 +2201,12 @@ namespace DomainTest.Repositories
         public async Task GetAllTimelines_WithTimelines_ShouldReturnList()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var timeline = await CreateTestTimeline(_context, user.UserId, "My Timeline");
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            var timeline = await CreateTestTimeline(context, user.UserId, "My Timeline");
+            DetachAllEntities(context);
 
             // Act
-            var result = await _timelineService.GetAllTimelines(user.UserId);
+            var result = await timelineService.GetAllTimelines(user.UserId);
 
             // Assert
             Assert.IsTrue(result.Any(t => t.Name == "My Timeline"));
@@ -2216,11 +2216,11 @@ namespace DomainTest.Repositories
         public async Task GetAllTimelines_WithNoTimelines_ShouldReturnEmptyList()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _timelineService.GetAllTimelines(user.UserId);
+            var result = await timelineService.GetAllTimelines(user.UserId);
 
             // Assert
             Assert.AreEqual(0, result.Count);
@@ -2234,11 +2234,11 @@ namespace DomainTest.Repositories
         public async Task AddTimeline_WithValidData_ShouldCreateTimeline()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _timelineService.AddTimeline(user.UserId, "New Timeline", "Description");
+            var result = await timelineService.AddTimeline(user.UserId, "New Timeline", "Description");
 
             // Assert
             Assert.IsNotNull(result);
@@ -2255,11 +2255,11 @@ namespace DomainTest.Repositories
         public async Task AddTimeline_WithNullDescription_ShouldCreateTimeline()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _timelineService.AddTimeline(user.UserId, "New Timeline", null);
+            var result = await timelineService.AddTimeline(user.UserId, "New Timeline", null);
 
             // Assert
             Assert.IsNotNull(result);
@@ -2273,13 +2273,13 @@ namespace DomainTest.Repositories
         public async Task AddDropToTimeline_ShouldAssociateDrop()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var timeline = await CreateTestTimeline(_context, user.UserId, "Test Timeline");
-            var drop = await CreateTestDrop(_context, user.UserId);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            var timeline = await CreateTestTimeline(context, user.UserId, "Test Timeline");
+            var drop = await CreateTestDrop(context, user.UserId);
+            DetachAllEntities(context);
 
             // Act
-            await _timelineService.AddDropToTimeline(user.UserId, drop.DropId, timeline.TimeLineId);
+            await timelineService.AddDropToTimeline(user.UserId, drop.DropId, timeline.TimeLineId);
 
             // Assert
             using (var verifyContext = CreateVerificationContext())
@@ -2298,14 +2298,14 @@ namespace DomainTest.Repositories
         public async Task RemoveDropFromTimeline_ShouldRemoveAssociation()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var timeline = await CreateTestTimeline(_context, user.UserId, "Test Timeline");
-            var drop = await CreateTestDrop(_context, user.UserId);
-            await AddDropToTimeline(_context, timeline.TimeLineId, drop.DropId);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            var timeline = await CreateTestTimeline(context, user.UserId, "Test Timeline");
+            var drop = await CreateTestDrop(context, user.UserId);
+            await AddDropToTimeline(context, timeline.TimeLineId, drop.DropId);
+            DetachAllEntities(context);
 
             // Act
-            await _timelineService.RemoveDropFromTimeline(user.UserId, drop.DropId, timeline.TimeLineId);
+            await timelineService.RemoveDropFromTimeline(user.UserId, drop.DropId, timeline.TimeLineId);
 
             // Assert
             using (var verifyContext = CreateVerificationContext())
@@ -2324,12 +2324,12 @@ namespace DomainTest.Repositories
         public async Task SoftDeleteTimeline_ShouldMarkAsDeleted()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var timeline = await CreateTestTimeline(_context, user.UserId, "To Delete");
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            var timeline = await CreateTestTimeline(context, user.UserId, "To Delete");
+            DetachAllEntities(context);
 
             // Act
-            var result = await _timelineService.SoftDeleteTimeline(user.UserId, timeline.TimeLineId);
+            var result = await timelineService.SoftDeleteTimeline(user.UserId, timeline.TimeLineId);
 
             // Assert
             Assert.IsNotNull(result);
@@ -2349,13 +2349,13 @@ namespace DomainTest.Repositories
         public async Task GetAllTimelines_OnlyReturnsOwnTimelines()
         {
             // Arrange
-            var owner = await CreateTestUser(_context);
-            var other = await CreateTestUser(_context);
-            await CreateTestTimeline(_context, owner.UserId, "Owner's Timeline");
-            DetachAllEntities(_context);
+            var owner = await CreateTestUser(context);
+            var other = await CreateTestUser(context);
+            await CreateTestTimeline(context, owner.UserId, "Owner's Timeline");
+            DetachAllEntities(context);
 
             // Act
-            var result = await _timelineService.GetAllTimelines(other.UserId);
+            var result = await timelineService.GetAllTimelines(other.UserId);
 
             // Assert
             Assert.IsFalse(result.Any(t => t.Name == "Owner's Timeline"));
@@ -2391,7 +2391,7 @@ namespace DomainTest.Repositories
     [TestCategory("AlbumService")]
     public class AlbumServiceTest : BaseRepositoryTest
     {
-        private AlbumService _albumService;
+        private AlbumService albumService;
 
         [TestInitialize]
         public void Setup()
@@ -2401,13 +2401,13 @@ namespace DomainTest.Repositories
             Environment.SetEnvironmentVariable("DatabaseConnection", connectionString);
 
             InitializeWithTransaction();
-            _albumService = TestServiceFactory.CreateAlbumService();
+            this.albumService = TestServiceFactory.CreateAlbumService();
         }
 
         [TestCleanup]
         public void Cleanup()
         {
-            _albumService?.Dispose();
+            albumService?.Dispose();
             CleanupWithTransaction();
         }
 
@@ -2417,12 +2417,12 @@ namespace DomainTest.Repositories
         public async Task GetActive_WithActiveAlbums_ShouldReturnActiveAlbums()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var album = await CreateTestAlbum(_context, user.UserId, "My Album");
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            var album = await CreateTestAlbum(context, user.UserId, "My Album");
+            DetachAllEntities(context);
 
             // Act
-            var result = await _albumService.GetActive(user.UserId);
+            var result = await albumService.GetActive(user.UserId);
 
             // Assert
             Assert.IsTrue(result.Any(a => a.Name == "My Album"));
@@ -2432,14 +2432,14 @@ namespace DomainTest.Repositories
         public async Task GetActive_WithArchivedAlbum_ShouldNotReturnArchived()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var album = await CreateTestAlbum(_context, user.UserId, "Archived Album");
+            var user = await CreateTestUser(context);
+            var album = await CreateTestAlbum(context, user.UserId, "Archived Album");
             album.Archived = true;
-            await _context.SaveChangesAsync();
-            DetachAllEntities(_context);
+            await context.SaveChangesAsync();
+            DetachAllEntities(context);
 
             // Act
-            var result = await _albumService.GetActive(user.UserId);
+            var result = await albumService.GetActive(user.UserId);
 
             // Assert
             Assert.IsFalse(result.Any(a => a.Name == "Archived Album"));
@@ -2453,11 +2453,11 @@ namespace DomainTest.Repositories
         public async Task Create_WithValidName_ShouldCreateAlbum()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _albumService.Create(user.UserId, "New Album");
+            var result = await albumService.Create(user.UserId, "New Album");
 
             // Assert
             Assert.IsNotNull(result);
@@ -2478,13 +2478,13 @@ namespace DomainTest.Repositories
         public async Task AddToMoment_ShouldAssociateDrop()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var album = await CreateTestAlbum(_context, user.UserId, "Test Album");
-            var drop = await CreateTestDrop(_context, user.UserId);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            var album = await CreateTestAlbum(context, user.UserId, "Test Album");
+            var drop = await CreateTestDrop(context, user.UserId);
+            DetachAllEntities(context);
 
             // Act
-            await _albumService.AddToMoment(user.UserId, album.AlbumId, drop.DropId);
+            await albumService.AddToMoment(user.UserId, album.AlbumId, drop.DropId);
 
             // Assert
             using (var verifyContext = CreateVerificationContext())
@@ -2503,14 +2503,14 @@ namespace DomainTest.Repositories
         public async Task RemoveToMoment_ShouldDisassociateDrop()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var album = await CreateTestAlbum(_context, user.UserId, "Test Album");
-            var drop = await CreateTestDrop(_context, user.UserId);
-            await AddDropToAlbum(_context, album.AlbumId, drop.DropId);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            var album = await CreateTestAlbum(context, user.UserId, "Test Album");
+            var drop = await CreateTestDrop(context, user.UserId);
+            await AddDropToAlbum(context, album.AlbumId, drop.DropId);
+            DetachAllEntities(context);
 
             // Act
-            await _albumService.RemoveToMoment(user.UserId, album.AlbumId, drop.DropId);
+            await albumService.RemoveToMoment(user.UserId, album.AlbumId, drop.DropId);
 
             // Assert
             using (var verifyContext = CreateVerificationContext())
@@ -2529,12 +2529,12 @@ namespace DomainTest.Repositories
         public async Task Delete_ShouldRemoveAlbum()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var album = await CreateTestAlbum(_context, user.UserId, "To Delete");
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            var album = await CreateTestAlbum(context, user.UserId, "To Delete");
+            DetachAllEntities(context);
 
             // Act
-            await _albumService.Delete(user.UserId, album.AlbumId);
+            await albumService.Delete(user.UserId, album.AlbumId);
 
             // Assert
             using (var verifyContext = CreateVerificationContext())
@@ -2552,13 +2552,13 @@ namespace DomainTest.Repositories
         public async Task GetActive_OnlyReturnsOwnAlbums()
         {
             // Arrange
-            var owner = await CreateTestUser(_context);
-            var other = await CreateTestUser(_context);
-            await CreateTestAlbum(_context, owner.UserId, "Owner's Album");
-            DetachAllEntities(_context);
+            var owner = await CreateTestUser(context);
+            var other = await CreateTestUser(context);
+            await CreateTestAlbum(context, owner.UserId, "Owner's Album");
+            DetachAllEntities(context);
 
             // Act
-            var result = await _albumService.GetActive(other.UserId);
+            var result = await albumService.GetActive(other.UserId);
 
             // Assert
             Assert.IsFalse(result.Any(a => a.Name == "Owner's Album"));
@@ -2589,7 +2589,7 @@ namespace DomainTest.Repositories
     [TestCategory("PromptService")]
     public class PromptServiceTest : BaseRepositoryTest
     {
-        private PromptService _promptService;
+        private PromptService promptService;
 
         [TestInitialize]
         public void Setup()
@@ -2599,13 +2599,13 @@ namespace DomainTest.Repositories
             Environment.SetEnvironmentVariable("DatabaseConnection", connectionString);
 
             InitializeWithTransaction();
-            _promptService = TestServiceFactory.CreatePromptService();
+            this.promptService = TestServiceFactory.CreatePromptService();
         }
 
         [TestCleanup]
         public void Cleanup()
         {
-            _promptService?.Dispose();
+            promptService?.Dispose();
             CleanupWithTransaction();
         }
 
@@ -2615,12 +2615,12 @@ namespace DomainTest.Repositories
         public async Task GetActivePrompts_ShouldReturnActivePrompts()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var prompt = await CreateTestPrompt(_context, "What is your favorite memory?", active: true);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            var prompt = await CreateTestPrompt(context, "What is your favorite memory?", active: true);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _promptService.GetActivePrompts(user.UserId);
+            var result = await promptService.GetActivePrompts(user.UserId);
 
             // Assert
             Assert.IsTrue(result.Any(p => p.Question.Contains("favorite memory")));
@@ -2630,12 +2630,12 @@ namespace DomainTest.Repositories
         public async Task GetActivePrompts_ShouldNotReturnInactivePrompts()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            await CreateTestPrompt(_context, "Inactive prompt", active: false);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            await CreateTestPrompt(context, "Inactive prompt", active: false);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _promptService.GetActivePrompts(user.UserId);
+            var result = await promptService.GetActivePrompts(user.UserId);
 
             // Assert
             Assert.IsFalse(result.Any(p => p.Question == "Inactive prompt"));
@@ -2649,11 +2649,11 @@ namespace DomainTest.Repositories
         public async Task CreatePrompt_WithValidQuestion_ShouldCreatePrompt()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _promptService.CreatePrompt(user.UserId, "What makes you happy?");
+            var result = await promptService.CreatePrompt(user.UserId, "What makes you happy?");
 
             // Assert
             Assert.IsNotNull(result);
@@ -2668,12 +2668,12 @@ namespace DomainTest.Repositories
         public async Task GetPrompt_WithValidId_ShouldReturnPrompt()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var prompt = await CreateTestPrompt(_context, "Test question?");
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            var prompt = await CreateTestPrompt(context, "Test question?");
+            DetachAllEntities(context);
 
             // Act
-            var result = await _promptService.GetPrompt(user.UserId, prompt.PromptId);
+            var result = await promptService.GetPrompt(user.UserId, prompt.PromptId);
 
             // Assert
             Assert.IsNotNull(result);
@@ -2688,13 +2688,13 @@ namespace DomainTest.Repositories
         public async Task DismissPrompt_ShouldMarkAsDismissed()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var prompt = await CreateTestPrompt(_context);
-            await CreateTestUserPrompt(_context, user.UserId, prompt.PromptId);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            var prompt = await CreateTestPrompt(context);
+            await CreateTestUserPrompt(context, user.UserId, prompt.PromptId);
+            DetachAllEntities(context);
 
             // Act
-            await _promptService.DismissPrompt(user.UserId, prompt.PromptId);
+            await promptService.DismissPrompt(user.UserId, prompt.PromptId);
 
             // Assert - Verify dismissed (implementation varies)
         }
@@ -2724,7 +2724,7 @@ namespace DomainTest.Repositories
     [TestCategory("PlanService")]
     public class PlanServiceTest : BaseRepositoryTest
     {
-        private PlanService _planService;
+        private PlanService planService;
 
         [TestInitialize]
         public void Setup()
@@ -2734,13 +2734,13 @@ namespace DomainTest.Repositories
             Environment.SetEnvironmentVariable("DatabaseConnection", connectionString);
 
             InitializeWithTransaction();
-            _planService = TestServiceFactory.CreatePlanService();
+            this.planService = TestServiceFactory.CreatePlanService();
         }
 
         [TestCleanup]
         public void Cleanup()
         {
-            _planService?.Dispose();
+            planService?.Dispose();
             CleanupWithTransaction();
         }
 
@@ -2750,11 +2750,11 @@ namespace DomainTest.Repositories
         public async Task GetPremiumPlanByUserId_WithNoPlan_ShouldReturnNull()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _planService.GetPremiumPlanByUserId(user.UserId);
+            var result = await planService.GetPremiumPlanByUserId(user.UserId);
 
             // Assert
             Assert.IsNull(result);
@@ -2764,7 +2764,7 @@ namespace DomainTest.Repositories
         public async Task GetPremiumPlanByUserId_WithPlan_ShouldReturnPlan()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
+            var user = await CreateTestUser(context);
             var plan = new PremiumPlan
             {
                 UserId = user.UserId,
@@ -2772,12 +2772,12 @@ namespace DomainTest.Repositories
                 Created = DateTime.UtcNow,
                 ExpirationDate = DateTime.UtcNow.AddDays(30)
             };
-            _context.PremiumPlans.Add(plan);
-            await _context.SaveChangesAsync();
-            DetachAllEntities(_context);
+            context.PremiumPlans.Add(plan);
+            await context.SaveChangesAsync();
+            DetachAllEntities(context);
 
             // Act
-            var result = await _planService.GetPremiumPlanByUserId(user.UserId);
+            var result = await planService.GetPremiumPlanByUserId(user.UserId);
 
             // Assert
             Assert.IsNotNull(result);
@@ -2791,11 +2791,11 @@ namespace DomainTest.Repositories
         public async Task GetSharedPlans_WithNoSharedPlans_ShouldReturnEmptyList()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _planService.GetSharedPlans(user.UserId);
+            var result = await planService.GetSharedPlans(user.UserId);
 
             // Assert
             Assert.AreEqual(0, result.Count);
@@ -2809,20 +2809,20 @@ namespace DomainTest.Repositories
         public async Task GetPremiumPlanByUserId_OnlyReturnsOwnPlan()
         {
             // Arrange
-            var owner = await CreateTestUser(_context);
-            var other = await CreateTestUser(_context);
+            var owner = await CreateTestUser(context);
+            var other = await CreateTestUser(context);
             var plan = new PremiumPlan
             {
                 UserId = owner.UserId,
                 PlanType = PlanTypes.Monthly,
                 Created = DateTime.UtcNow
             };
-            _context.PremiumPlans.Add(plan);
-            await _context.SaveChangesAsync();
-            DetachAllEntities(_context);
+            context.PremiumPlans.Add(plan);
+            await context.SaveChangesAsync();
+            DetachAllEntities(context);
 
             // Act
-            var result = await _planService.GetPremiumPlanByUserId(other.UserId);
+            var result = await planService.GetPremiumPlanByUserId(other.UserId);
 
             // Assert
             Assert.IsNull(result);
@@ -2855,7 +2855,7 @@ namespace DomainTest.Repositories
     [TestCategory("MemoryShareLinkService")]
     public class MemoryShareLinkServiceTest : BaseRepositoryTest
     {
-        private MemoryShareLinkService _shareLinkService;
+        private MemoryShareLinkService shareLinkService;
 
         [TestInitialize]
         public void Setup()
@@ -2865,13 +2865,13 @@ namespace DomainTest.Repositories
             Environment.SetEnvironmentVariable("DatabaseConnection", connectionString);
 
             InitializeWithTransaction();
-            _shareLinkService = TestServiceFactory.CreateMemoryShareLinkService();
+            this.shareLinkService = TestServiceFactory.CreateMemoryShareLinkService();
         }
 
         [TestCleanup]
         public void Cleanup()
         {
-            _shareLinkService?.Dispose();
+            shareLinkService?.Dispose();
             CleanupWithTransaction();
         }
 
@@ -2881,12 +2881,12 @@ namespace DomainTest.Repositories
         public async Task CreateLink_ValidDrop_ReturnsToken()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var drop = await CreateTestDrop(_context, user.UserId);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            var drop = await CreateTestDrop(context, user.UserId);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _shareLinkService.CreateLink(user.UserId, drop.DropId, null);
+            var result = await shareLinkService.CreateLink(user.UserId, drop.DropId, null);
 
             // Assert
             Assert.IsNotNull(result);
@@ -2897,13 +2897,13 @@ namespace DomainTest.Repositories
         public async Task CreateLink_WithExpiration_ShouldSetExpirationDate()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var drop = await CreateTestDrop(_context, user.UserId);
+            var user = await CreateTestUser(context);
+            var drop = await CreateTestDrop(context, user.UserId);
             var expirationDays = 7;
-            DetachAllEntities(_context);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _shareLinkService.CreateLink(user.UserId, drop.DropId, expirationDays);
+            var result = await shareLinkService.CreateLink(user.UserId, drop.DropId, expirationDays);
 
             // Assert
             Assert.IsNotNull(result);
@@ -2920,12 +2920,12 @@ namespace DomainTest.Repositories
         public async Task CreateLink_WithNullExpiration_ShouldCreatePermanentLink()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var drop = await CreateTestDrop(_context, user.UserId);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            var drop = await CreateTestDrop(context, user.UserId);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _shareLinkService.CreateLink(user.UserId, drop.DropId, null);
+            var result = await shareLinkService.CreateLink(user.UserId, drop.DropId, null);
 
             // Assert
             using (var verifyContext = CreateVerificationContext())
@@ -2941,13 +2941,13 @@ namespace DomainTest.Repositories
         public async Task CreateLink_ForOtherUsersDrop_ShouldThrow()
         {
             // Arrange
-            var owner = await CreateTestUser(_context);
-            var other = await CreateTestUser(_context);
-            var drop = await CreateTestDrop(_context, owner.UserId);
-            DetachAllEntities(_context);
+            var owner = await CreateTestUser(context);
+            var other = await CreateTestUser(context);
+            var drop = await CreateTestDrop(context, owner.UserId);
+            DetachAllEntities(context);
 
             // Act
-            await _shareLinkService.CreateLink(other.UserId, drop.DropId, null);
+            await shareLinkService.CreateLink(other.UserId, drop.DropId, null);
         }
 
         #endregion
@@ -2958,13 +2958,13 @@ namespace DomainTest.Repositories
         public async Task GetByToken_ValidToken_ReturnsDrop()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var drop = await CreateTestDrop(_context, user.UserId);
-            DetachAllEntities(_context);
-            var linkResult = await _shareLinkService.CreateLink(user.UserId, drop.DropId, null);
+            var user = await CreateTestUser(context);
+            var drop = await CreateTestDrop(context, user.UserId);
+            DetachAllEntities(context);
+            var linkResult = await shareLinkService.CreateLink(user.UserId, drop.DropId, null);
 
             // Act
-            var result = await _shareLinkService.GetByToken(linkResult.Token);
+            var result = await shareLinkService.GetByToken(linkResult.Token);
 
             // Assert
             Assert.IsNotNull(result);
@@ -2975,8 +2975,8 @@ namespace DomainTest.Repositories
         public async Task GetByToken_ExpiredToken_ReturnsNull()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var drop = await CreateTestDrop(_context, user.UserId);
+            var user = await CreateTestUser(context);
+            var drop = await CreateTestDrop(context, user.UserId);
 
             var link = new MemoryShareLink
             {
@@ -2987,12 +2987,12 @@ namespace DomainTest.Repositories
                 ExpiresAt = DateTime.UtcNow.AddDays(-1), // Expired
                 IsActive = true
             };
-            _context.MemoryShareLinks.Add(link);
-            await _context.SaveChangesAsync();
-            DetachAllEntities(_context);
+            context.MemoryShareLinks.Add(link);
+            await context.SaveChangesAsync();
+            DetachAllEntities(context);
 
             // Act
-            var result = await _shareLinkService.GetByToken(link.Token);
+            var result = await shareLinkService.GetByToken(link.Token);
 
             // Assert
             Assert.IsNull(result);
@@ -3002,7 +3002,7 @@ namespace DomainTest.Repositories
         public async Task GetByToken_InvalidToken_ReturnsNull()
         {
             // Act
-            var result = await _shareLinkService.GetByToken("invalid-token-that-does-not-exist");
+            var result = await shareLinkService.GetByToken("invalid-token-that-does-not-exist");
 
             // Assert
             Assert.IsNull(result);
@@ -3012,8 +3012,8 @@ namespace DomainTest.Repositories
         public async Task GetByToken_DeactivatedLink_ReturnsNull()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var drop = await CreateTestDrop(_context, user.UserId);
+            var user = await CreateTestUser(context);
+            var drop = await CreateTestDrop(context, user.UserId);
 
             var link = new MemoryShareLink
             {
@@ -3023,12 +3023,12 @@ namespace DomainTest.Repositories
                 CreatedAt = DateTime.UtcNow,
                 IsActive = false // Deactivated
             };
-            _context.MemoryShareLinks.Add(link);
-            await _context.SaveChangesAsync();
-            DetachAllEntities(_context);
+            context.MemoryShareLinks.Add(link);
+            await context.SaveChangesAsync();
+            DetachAllEntities(context);
 
             // Act
-            var result = await _shareLinkService.GetByToken(link.Token);
+            var result = await shareLinkService.GetByToken(link.Token);
 
             // Assert
             Assert.IsNull(result);
@@ -3042,16 +3042,16 @@ namespace DomainTest.Repositories
         public async Task RevokeLink_ValidToken_ShouldDeactivateLink()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var drop = await CreateTestDrop(_context, user.UserId);
-            DetachAllEntities(_context);
-            var linkResult = await _shareLinkService.CreateLink(user.UserId, drop.DropId, null);
+            var user = await CreateTestUser(context);
+            var drop = await CreateTestDrop(context, user.UserId);
+            DetachAllEntities(context);
+            var linkResult = await shareLinkService.CreateLink(user.UserId, drop.DropId, null);
 
             // Act
-            await _shareLinkService.RevokeLink(user.UserId, linkResult.Token);
+            await shareLinkService.RevokeLink(user.UserId, linkResult.Token);
 
             // Assert
-            var fetchedDrop = await _shareLinkService.GetByToken(linkResult.Token);
+            var fetchedDrop = await shareLinkService.GetByToken(linkResult.Token);
             Assert.IsNull(fetchedDrop);
         }
 
@@ -3060,14 +3060,14 @@ namespace DomainTest.Repositories
         public async Task RevokeLink_ByNonOwner_ShouldThrow()
         {
             // Arrange
-            var owner = await CreateTestUser(_context);
-            var other = await CreateTestUser(_context);
-            var drop = await CreateTestDrop(_context, owner.UserId);
-            DetachAllEntities(_context);
-            var linkResult = await _shareLinkService.CreateLink(owner.UserId, drop.DropId, null);
+            var owner = await CreateTestUser(context);
+            var other = await CreateTestUser(context);
+            var drop = await CreateTestDrop(context, owner.UserId);
+            DetachAllEntities(context);
+            var linkResult = await shareLinkService.CreateLink(owner.UserId, drop.DropId, null);
 
             // Act
-            await _shareLinkService.RevokeLink(other.UserId, linkResult.Token);
+            await shareLinkService.RevokeLink(other.UserId, linkResult.Token);
         }
 
         #endregion
@@ -3078,14 +3078,14 @@ namespace DomainTest.Repositories
         public async Task GetLinksForDrop_WithLinks_ShouldReturnList()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var drop = await CreateTestDrop(_context, user.UserId);
-            DetachAllEntities(_context);
-            await _shareLinkService.CreateLink(user.UserId, drop.DropId, null);
-            await _shareLinkService.CreateLink(user.UserId, drop.DropId, 30);
+            var user = await CreateTestUser(context);
+            var drop = await CreateTestDrop(context, user.UserId);
+            DetachAllEntities(context);
+            await shareLinkService.CreateLink(user.UserId, drop.DropId, null);
+            await shareLinkService.CreateLink(user.UserId, drop.DropId, 30);
 
             // Act
-            var result = await _shareLinkService.GetLinksForDrop(user.UserId, drop.DropId);
+            var result = await shareLinkService.GetLinksForDrop(user.UserId, drop.DropId);
 
             // Assert
             Assert.AreEqual(2, result.Count);
@@ -3095,12 +3095,12 @@ namespace DomainTest.Repositories
         public async Task GetLinksForDrop_WithNoLinks_ShouldReturnEmptyList()
         {
             // Arrange
-            var user = await CreateTestUser(_context);
-            var drop = await CreateTestDrop(_context, user.UserId);
-            DetachAllEntities(_context);
+            var user = await CreateTestUser(context);
+            var drop = await CreateTestDrop(context, user.UserId);
+            DetachAllEntities(context);
 
             // Act
-            var result = await _shareLinkService.GetLinksForDrop(user.UserId, drop.DropId);
+            var result = await shareLinkService.GetLinksForDrop(user.UserId, drop.DropId);
 
             // Assert
             Assert.AreEqual(0, result.Count);
@@ -3111,13 +3111,13 @@ namespace DomainTest.Repositories
         public async Task GetLinksForDrop_ByNonOwner_ShouldThrow()
         {
             // Arrange
-            var owner = await CreateTestUser(_context);
-            var other = await CreateTestUser(_context);
-            var drop = await CreateTestDrop(_context, owner.UserId);
-            DetachAllEntities(_context);
+            var owner = await CreateTestUser(context);
+            var other = await CreateTestUser(context);
+            var drop = await CreateTestDrop(context, owner.UserId);
+            DetachAllEntities(context);
 
             // Act
-            await _shareLinkService.GetLinksForDrop(other.UserId, drop.DropId);
+            await shareLinkService.GetLinksForDrop(other.UserId, drop.DropId);
         }
 
         #endregion

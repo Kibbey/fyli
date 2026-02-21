@@ -211,7 +211,7 @@ public UserService(
     this.sendEmailService = sendEmailService;
     this.tokenService = tokenService;
     this.groupService = groupService;
-    _logger = logger;
+    this.logger = logger;
 }
 ```
 

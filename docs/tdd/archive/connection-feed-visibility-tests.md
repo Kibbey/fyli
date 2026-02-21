@@ -89,7 +89,7 @@ public async Task InvitationConnect_ShareToAllConnections_BothUsersSeeDropInFeed
     DetachAllEntities(_context);
 
     // Act 1: UserB accepts the invitation (creates bidirectional connection)
-    await _sharingService.ConfirmationSharingRequest(
+    await sharingService.ConfirmationSharingRequest(
         request.RequestKey.ToString(), userB.UserId, "Alice");
 
     // ConfirmationSharingRequest only calls PopulateEveryone for the acceptor (B).
@@ -262,9 +262,9 @@ public async Task InvitationConnect_ShareToSpecificUserGroup_OnlyTargetSees()
     await _context.SaveChangesAsync();
     DetachAllEntities(_context);
 
-    await _sharingService.ConfirmationSharingRequest(
+    await sharingService.ConfirmationSharingRequest(
         requestAB.RequestKey.ToString(), userB.UserId, "Alice");
-    await _sharingService.ConfirmationSharingRequest(
+    await sharingService.ConfirmationSharingRequest(
         requestAC.RequestKey.ToString(), userC.UserId, "Alice");
 
     // Act: Create a custom group for Bob and share a drop only with Bob
@@ -324,7 +324,7 @@ public async Task UnconnectedUser_CannotSeeSharedDrops()
     await _context.SaveChangesAsync();
     DetachAllEntities(_context);
 
-    await _sharingService.ConfirmationSharingRequest(
+    await sharingService.ConfirmationSharingRequest(
         request.RequestKey.ToString(), userB.UserId, "Alice");
 
     // Populate groups for both users
@@ -383,7 +383,7 @@ public async Task PrivateDrop_NotVisibleToConnection_UntilShared()
     await _context.SaveChangesAsync();
     DetachAllEntities(_context);
 
-    await _sharingService.ConfirmationSharingRequest(
+    await sharingService.ConfirmationSharingRequest(
         request.RequestKey.ToString(), userB.UserId, "Alice");
 
     // Act: UserA creates a PRIVATE drop (no network tags)
@@ -418,7 +418,7 @@ The test class needs multiple services that share contexts:
 [TestCategory("FeedVisibility")]
 public class FeedVisibilityTest : BaseRepositoryTest
 {
-    private SharingService _sharingService;
+    private SharingService sharingService;
     private DropsService _dropsService;
     private GroupService _groupService;
     private MemoryShareLinkService _shareLinkService;
@@ -441,16 +441,16 @@ public class FeedVisibilityTest : BaseRepositoryTest
             sendEmailService, _groupService, new NullLogger<NotificationService>());
         _dropsService = TestServiceFactory.CreateDropsService(
             sendEmailService, notificationService, null, _groupService);
-        _sharingService = TestServiceFactory.CreateSharingService(
+        sharingService = TestServiceFactory.CreateSharingService(
             sendEmailService, notificationService, _groupService);
         _shareLinkService = TestServiceFactory.CreateMemoryShareLinkService(
-            _sharingService, _groupService);
+            sharingService, _groupService);
     }
 
     [TestCleanup]
     public void Cleanup()
     {
-        _sharingService?.Dispose();
+        sharingService?.Dispose();
         _dropsService?.Dispose();
         _groupService?.Dispose();
         _shareLinkService?.Dispose();

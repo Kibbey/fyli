@@ -69,11 +69,11 @@ Examples:
 public async Task MethodName_Scenario_ExpectedBehavior()
 {
     // Arrange - Set up test data and preconditions
-    var user = await CreateTestUser(_context);
-    DetachAllEntities(_context);
+    var user = await CreateTestUser(context);
+    DetachAllEntities(context);
 
     // Act - Execute the method under test
-    var result = await _service.Method(user.UserId);
+    var result = await service.Method(user.UserId);
 
     // Assert - Verify the expected outcome
     Assert.IsNotNull(result);
@@ -82,14 +82,14 @@ public async Task MethodName_Scenario_ExpectedBehavior()
 
 ### Critical: Context Isolation for Service Tests
 
-Services create their own `DbContext` via `BaseService`. A transaction on the test `_context` will lock rows and cause 30-second timeout errors.
+Services create their own `DbContext` via `BaseService`. A transaction on the test `context` will lock rows and cause 30-second timeout errors.
 
 **Never use `InitializeWithTransaction()` for tests that call service methods.**
 
 #### Correct Pattern
 
-1. `_context = CreateTestContext()` (no transaction)
-2. Insert test data, call `DetachAllEntities(_context)` before service calls
+1. `context = CreateTestContext()` (no transaction)
+2. Insert test data, call `DetachAllEntities(context)` before service calls
 3. Service creates its own context and reads committed data
 4. Verify with `CreateVerificationContext()`
 
@@ -97,19 +97,19 @@ Services create their own `DbContext` via `BaseService`. A transaction on the te
 [TestInitialize]
 public void Setup()
 {
-    _context = CreateTestContext();  // No transaction
-    _service = TestServiceFactory.CreateService();
+    context = CreateTestContext();  // No transaction
+    service = TestServiceFactory.CreateService();
 }
 
 [TestMethod]
 public async Task Example_ServiceTest()
 {
     // Arrange
-    var user = await CreateTestUser(_context);
-    DetachAllEntities(_context);  // Detach so service context can read
+    var user = await CreateTestUser(context);
+    DetachAllEntities(context);  // Detach so service context can read
 
     // Act
-    var result = await _service.DoSomething(user.UserId);
+    var result = await service.DoSomething(user.UserId);
 
     // Assert
     Assert.IsNotNull(result);
@@ -126,13 +126,13 @@ When testing methods that rely on navigation properties (e.g., `RemoveConnection
 
 ```csharp
 // BAD - navigation properties not loaded
-var connection = await CreateTestConnection(_context, user1.UserId, user2.UserId);
-DetachAllEntities(_context);
-await _service.RemoveConnection(user1.UserId, user2.UserId); // May fail
+var connection = await CreateTestConnection(context, user1.UserId, user2.UserId);
+DetachAllEntities(context);
+await service.RemoveConnection(user1.UserId, user2.UserId); // May fail
 
 // GOOD - service creates entities with proper navigation properties
-await _service.EnsureConnectionAsync(user1.UserId, user2.UserId);
-await _service.RemoveConnection(user1.UserId, user2.UserId); // Works
+await service.EnsureConnectionAsync(user1.UserId, user2.UserId);
+await service.RemoveConnection(user1.UserId, user2.UserId); // Works
 ```
 
 ### Verification with Fresh Context
@@ -154,7 +154,7 @@ using (var verifyContext = CreateVerificationContext())
 [ExpectedException(typeof(NotAuthorizedException))]
 public async Task Method_InvalidCondition_ShouldThrowException()
 {
-    await _service.Method(invalidArg);
+    await service.Method(invalidArg);
 }
 ```
 
@@ -170,13 +170,13 @@ Use MSTest categories to organize and filter tests:
 ### Test Helper Methods (BaseRepositoryTest)
 
 Available helpers in the base class:
-- `CreateTestUser(_context)` — creates a user with profile
-- `CreateTestDrop(_context, userId)` — creates a drop (memory)
-- `CreateTestConnection(_context, userId1, userId2)` — creates a connection between users
-- `CreateTestGroup(_context, userId, name)` — creates a group
-- `CreateTestTimeline(_context, userId, name)` — creates a timeline
-- `CreateTestAlbum(_context, userId, name)` — creates an album
-- `DetachAllEntities(_context)` — detaches all tracked entities
+- `CreateTestUser(context)` — creates a user with profile
+- `CreateTestDrop(context, userId)` — creates a drop (memory)
+- `CreateTestConnection(context, userId1, userId2)` — creates a connection between users
+- `CreateTestGroup(context, userId, name)` — creates a group
+- `CreateTestTimeline(context, userId, name)` — creates a timeline
+- `CreateTestAlbum(context, userId, name)` — creates an album
+- `DetachAllEntities(context)` — detaches all tracked entities
 - `CreateTestContext()` — creates a new DbContext
 - `CreateVerificationContext()` — creates a fresh context for verification
 

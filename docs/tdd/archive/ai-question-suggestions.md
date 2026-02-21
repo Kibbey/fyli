@@ -435,7 +435,7 @@ New file at `cimplur-core/Memento/Domain/Repositories/QuestionSuggestionService.
 
 Phase 1 uses intent-only context. Phases 2 and 3 add history and storyline context. Rate limiting uses the database-backed `CacheEntry` table for distributed consistency. Uses optimistic increment (increment before AI call, decrement on failure) to prevent race conditions.
 
-**Field naming note:** This codebase uses `camelCase` without underscore prefix for private fields (e.g., `private readonly IAiCompletionService aiService`). This is an intentional deviation from the style checklist's `_camelCase` convention — all existing services (`QuestionService`, `QuestionController`, etc.) follow the no-underscore pattern, and consistency within the codebase takes priority.
+**Field naming note:** This codebase uses `camelCase` without underscore prefix for private fields (e.g., `private readonly IAiCompletionService aiService`), with `this.fieldName` for constructor assignments to disambiguate from parameters.
 
 ```csharp
 using System;

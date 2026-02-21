@@ -154,7 +154,7 @@ namespace Domain.BackgroundJobs
 {
     public class BackgroundJobQueue : IBackgroundJobQueue
     {
-        private readonly Channel<NotificationJob> _channel =
+        private readonly Channel<NotificationJob> channel =
             Channel.CreateBounded<NotificationJob>(new BoundedChannelOptions(1000)
             {
                 FullMode = BoundedChannelFullMode.Wait
@@ -162,13 +162,13 @@ namespace Domain.BackgroundJobs
 
         public async ValueTask EnqueueNotificationAsync(NotificationJob job)
         {
-            await _channel.Writer.WriteAsync(job);
+            await channel.Writer.WriteAsync(job);
         }
 
         public async ValueTask<NotificationJob> DequeueAsync(
             CancellationToken cancellationToken)
         {
-            return await _channel.Reader.ReadAsync(cancellationToken);
+            return await channel.Reader.ReadAsync(cancellationToken);
         }
     }
 }
@@ -189,18 +189,18 @@ namespace Domain.BackgroundJobs
 {
     public class NotificationJobProcessor : BackgroundService
     {
-        private readonly IBackgroundJobQueue _queue;
-        private readonly IServiceScopeFactory _scopeFactory;
-        private readonly ILogger<NotificationJobProcessor> _logger;
+        private readonly IBackgroundJobQueue queue;
+        private readonly IServiceScopeFactory scopeFactory;
+        private readonly ILogger<NotificationJobProcessor> logger;
 
         public NotificationJobProcessor(
             IBackgroundJobQueue queue,
             IServiceScopeFactory scopeFactory,
             ILogger<NotificationJobProcessor> logger)
         {
-            _queue = queue;
-            _scopeFactory = scopeFactory;
-            _logger = logger;
+            this.queue = queue;
+            this.scopeFactory = scopeFactory;
+            this.logger = logger;
         }
 
         protected override async Task ExecuteAsync(
@@ -210,7 +210,7 @@ namespace Domain.BackgroundJobs
             {
                 try
                 {
-                    var job = await _queue.DequeueAsync(stoppingToken);
+                    var job = await this.queue.DequeueAsync(stoppingToken);
                     await ProcessJob(job);
                 }
                 catch (OperationCanceledException)
@@ -219,7 +219,7 @@ namespace Domain.BackgroundJobs
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex,
+                    logger.LogError(ex,
                         "Error processing notification job");
                 }
             }
@@ -229,7 +229,7 @@ namespace Domain.BackgroundJobs
         {
             try
             {
-                using var scope = _scopeFactory.CreateScope();
+                using var scope = scopeFactory.CreateScope();
                 var notificationService = scope.ServiceProvider
                     .GetRequiredService<NotificationService>();
                 await notificationService.AddNotificationDropAdded(
@@ -237,7 +237,7 @@ namespace Domain.BackgroundJobs
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex,
+                logger.LogError(ex,
                     "Failed notification job for drop {DropId}, user {UserId}",
                     job.DropId, job.CreatorUserId);
             }
@@ -258,7 +258,7 @@ services.AddHostedService<NotificationJobProcessor>();
 
 ```csharp
 // Inject via constructor
-private IBackgroundJobQueue _jobQueue;
+private IBackgroundJobQueue jobQueue;
 
 public DropsService(
     SendEmailService sendEmailService,
@@ -269,13 +269,13 @@ public DropsService(
     IBackgroundJobQueue jobQueue)
 {
     // ... existing assignments ...
-    _jobQueue = jobQueue;
+    this.jobQueue = jobQueue;
 }
 
 // In Add() method, replace lines 91-94:
 if (selectedNetworkIds?.Any() ?? false)
 {
-    await _jobQueue.EnqueueNotificationAsync(new NotificationJob
+    await jobQueue.EnqueueNotificationAsync(new NotificationJob
     {
         CreatorUserId = userId,
         NetworkIds = selectedNetworkIds.ToHashSet(),
@@ -479,7 +479,7 @@ Move notification processing off the request path entirely.
 1. Create `Domain/BackgroundJobs/` directory with 4 files
 2. Register `IBackgroundJobQueue` (singleton) and `NotificationJobProcessor` (hosted service) in `Startup.cs`
 3. Inject `IBackgroundJobQueue` into `DropsService`
-4. Replace `await notificationService.AddNotificationDropAdded(...)` with `await _jobQueue.EnqueueNotificationAsync(...)`
+4. Replace `await notificationService.AddNotificationDropAdded(...)` with `await jobQueue.EnqueueNotificationAsync(...)`
 
 **Future extension (out of scope for this TDD):**
 - `DropsService.AddComment()` (lines 667-676) has a similar per-commenter notification loop. It requires a different job payload (dropId + commenterId + list of commenter IDs) since it notifies previous commenters + drop creator, not group viewers. A separate `CommentNotificationJob` should be created in a follow-up TDD.

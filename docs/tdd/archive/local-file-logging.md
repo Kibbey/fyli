@@ -105,11 +105,11 @@ namespace Memento.Libs
     /// </summary>
     public class FileLoggerProvider : ILoggerProvider
     {
-        private readonly LogLevel _minLevel;
-        private readonly LogLevel _maxLevel;
-        private readonly string _categoryFilter;
-        private readonly object _lock = new();
-        private readonly StreamWriter _writer;
+        private readonly LogLevel minLevel;
+        private readonly LogLevel maxLevel;
+        private readonly string categoryFilter;
+        private readonly object @lock = new();
+        private readonly StreamWriter writer;
 
         /// <param name="filePath">Absolute path to log file</param>
         /// <param name="minLevel">Minimum log level (inclusive)</param>
@@ -125,15 +125,15 @@ namespace Memento.Libs
             LogLevel maxLevel,
             string categoryFilter = null)
         {
-            _minLevel = minLevel;
-            _maxLevel = maxLevel;
-            _categoryFilter = categoryFilter;
+            this.minLevel = minLevel;
+            this.maxLevel = maxLevel;
+            this.categoryFilter = categoryFilter;
 
             var directory = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrEmpty(directory))
                 Directory.CreateDirectory(directory);
 
-            _writer = new StreamWriter(filePath, append: false)
+            this.writer = new StreamWriter(filePath, append: false)
             {
                 AutoFlush = true
             };
@@ -142,24 +142,24 @@ namespace Memento.Libs
         public ILogger CreateLogger(string categoryName)
         {
             return new FileLogger(
-                categoryName, _writer, _lock,
-                _minLevel, _maxLevel, _categoryFilter);
+                categoryName, writer, @lock,
+                minLevel, maxLevel, categoryFilter);
         }
 
         public void Dispose()
         {
-            _writer?.Dispose();
+            writer?.Dispose();
         }
     }
 
     public class FileLogger : ILogger
     {
-        private readonly string _categoryName;
-        private readonly StreamWriter _writer;
-        private readonly object _lock;
-        private readonly LogLevel _minLevel;
-        private readonly LogLevel _maxLevel;
-        private readonly bool _enabled;
+        private readonly string categoryName;
+        private readonly StreamWriter writer;
+        private readonly object @lock;
+        private readonly LogLevel minLevel;
+        private readonly LogLevel maxLevel;
+        private readonly bool enabled;
 
         public FileLogger(
             string categoryName,
@@ -169,14 +169,14 @@ namespace Memento.Libs
             LogLevel maxLevel,
             string categoryFilter)
         {
-            _categoryName = categoryName;
-            _writer = writer;
-            _lock = lockObj;
-            _minLevel = minLevel;
-            _maxLevel = maxLevel;
+            this.categoryName = categoryName;
+            this.writer = writer;
+            this.@lock = lockObj;
+            this.minLevel = minLevel;
+            this.maxLevel = maxLevel;
 
             // Pre-compute whether this logger is active based on category
-            _enabled = string.IsNullOrEmpty(categoryFilter)
+            this.enabled = string.IsNullOrEmpty(categoryFilter)
                 || categoryName.Contains(categoryFilter,
                     StringComparison.OrdinalIgnoreCase);
         }
@@ -186,9 +186,9 @@ namespace Memento.Libs
 
         public bool IsEnabled(LogLevel logLevel)
         {
-            return _enabled
-                && logLevel >= _minLevel
-                && logLevel <= _maxLevel;
+            return enabled
+                && logLevel >= minLevel
+                && logLevel <= maxLevel;
         }
 
         public void Log<TState>(
@@ -207,13 +207,13 @@ namespace Memento.Libs
                 $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} " +
                 $"[{logLevel}] " +
                 $"[Thread {threadId}] " +
-                $"{_categoryName}: {message}";
+                $"{categoryName}: {message}";
 
-            lock (_lock)
+            lock (@lock)
             {
-                _writer.WriteLine(logLine);
+                writer.WriteLine(logLine);
                 if (exception != null)
-                    _writer.WriteLine(exception.ToString());
+                    writer.WriteLine(exception.ToString());
             }
         }
     }
@@ -295,7 +295,7 @@ Add `ILogger<SendEmailService>` to the constructor and log email details in `Sen
 using Microsoft.Extensions.Logging;
 
 // Add field
-private readonly ILogger<SendEmailService> _logger;
+private readonly ILogger<SendEmailService> logger;
 
 // Updated constructor
 public SendEmailService(
@@ -309,7 +309,7 @@ public SendEmailService(
     EmailPW = settings.EmailCode;
     PostMarkToken = settings.EmailToken;
     this.tokenService = tokenService;
-    _logger = logger;
+    this.logger = logger;
 }
 ```
 
@@ -331,7 +331,7 @@ public async Task SendAsync(string email, EmailTypes template, object model)
         model);
     var text = GetPlainTextFromHtml(body);
 
-    _logger?.LogInformation(
+    logger?.LogInformation(
         "EMAIL | To: {To} | Template: {Template} | Subject: {Subject}\n{Body}",
         email, template, subject, text);
 
@@ -341,7 +341,7 @@ public async Task SendAsync(string email, EmailTypes template, object model)
 }
 ```
 
-The `_logger?.` null-conditional handles cases where logger is null (e.g., in tests).
+The `logger?.` null-conditional handles cases where logger is null (e.g., in tests).
 
 **Example `emails.log` output:**
 ```
@@ -392,11 +392,11 @@ private ILog logger = LogManager.GetLogger(nameof(TransactionService));
 using Microsoft.Extensions.Logging;
 ```
 ```csharp
-private readonly ILogger<TransactionService> _logger;
+private readonly ILogger<TransactionService> logger;
 
 public TransactionService(ILogger<TransactionService> logger)
 {
-    _logger = logger;
+    this.logger = logger;
 }
 ```
 
@@ -405,7 +405,7 @@ public TransactionService(ILogger<TransactionService> logger)
 // Before:
 logger.Error("HIGH IMPORTANCE ERROR - ALERT!", e);
 // After:
-_logger.LogError(e, "HIGH IMPORTANCE ERROR - ALERT!");
+logger.LogError(e, "HIGH IMPORTANCE ERROR - ALERT!");
 ```
 
 #### Step 2: SharingService
@@ -427,7 +427,7 @@ using Microsoft.Extensions.Logging;
 
 **Add `ILogger` to constructor:**
 ```csharp
-private readonly ILogger<SharingService> _logger;
+private readonly ILogger<SharingService> logger;
 
 public SharingService(
     SendEmailService sendEmailService,
@@ -442,17 +442,17 @@ public SharingService(
     this.promptService = promptService;
     this.timelineService = timelineService;
     this.groupService = groupService;
-    _logger = logger;
+    this.logger = logger;
 }
 ```
 
 **Replace log calls:**
 ```csharp
 // log.Error("Share Request", e)  →
-_logger.LogError(e, "Share Request");
+logger.LogError(e, "Share Request");
 
 // log.Error(ex)  →  (3 occurrences)
-_logger.LogError(ex, "An error occurred");
+logger.LogError(ex, "An error occurred");
 ```
 
 #### Step 3: ImageService
@@ -474,21 +474,21 @@ using Microsoft.Extensions.Logging;
 
 **Add `ILogger` to constructor:**
 ```csharp
-private readonly ILogger<ImageService> _logger;
+private readonly ILogger<ImageService> logger;
 
 public ImageService(
     PermissionService permissionService,
     ILogger<ImageService> logger)
 {
     this.permissionService = permissionService;
-    _logger = logger;
+    this.logger = logger;
 }
 ```
 
 **Replace log call:**
 ```csharp
 // log.Error("Delete", e)  →
-_logger.LogError(e, "Delete");
+logger.LogError(e, "Delete");
 ```
 
 #### Step 4: MovieService
@@ -510,36 +510,36 @@ using Microsoft.Extensions.Logging;
 
 **Add `ILogger` to constructor:**
 ```csharp
-private readonly ILogger<MovieService> _logger;
+private readonly ILogger<MovieService> logger;
 
 public MovieService(
     PermissionService permissionService,
     ILogger<MovieService> logger)
 {
     this.permissionService = permissionService;
-    _logger = logger;
+    this.logger = logger;
 }
 ```
 
 **Replace log calls:**
 ```csharp
 // log.Error("get thumb", e)  →
-_logger.LogError(e, "get thumb");
+logger.LogError(e, "get thumb");
 
 // log.Error("Delete 1", e)  →
-_logger.LogError(e, "Delete 1");
+logger.LogError(e, "Delete 1");
 
 // log.Error("Delete 2", e)  →
-_logger.LogError(e, "Delete 2");
+logger.LogError(e, "Delete 2");
 
 // log.Error("Delete folder", e)  →
-_logger.LogError(e, "Delete folder");
+logger.LogError(e, "Delete folder");
 
 // log.Error($"Error creating MediaConvert job for {name}", e)  →
-_logger.LogError(e, "Error creating MediaConvert job for {Name}", name);
+logger.LogError(e, "Error creating MediaConvert job for {Name}", name);
 
 // log.Info($"MediaConvert job created successfully. Job ID: {response.Job.Id}, Status: {response.Job.Status}")  →
-_logger.LogInformation(
+logger.LogInformation(
     "MediaConvert job created successfully. Job ID: {JobId}, Status: {Status}",
     response.Job.Id, response.Job.Status);
 ```
@@ -595,7 +595,7 @@ tail -f cimplur-core/Memento/Memento/logs/emails.log
 1. Confirm `ASPNETCORE_ENVIRONMENT` is **not** `Development` in production
 2. No file logging providers are registered — only console (unchanged behavior)
 3. CloudWatch continues to pick up stdout/stderr as before
-4. `_logger?.LogInformation()` in `SendEmailService` still fires but goes to console only — acceptable since production emails are actually sent via Postmark
+4. `logger?.LogInformation()` in `SendEmailService` still fires but goes to console only — acceptable since production emails are actually sent via Postmark
 
 ## Key Design Decisions
 
@@ -609,7 +609,7 @@ tail -f cimplur-core/Memento/Memento/logs/emails.log
 | `IsDevelopment()` guard | Production remains console-only, no file I/O overhead |
 | Thread-safe via `lock` | Multiple loggers from different threads write safely |
 | Thread ID in log format | Helps debug concurrency issues in async operations |
-| Null-conditional `_logger?.` | `TestSendEmailService` passes `null` — avoids breaking existing tests |
+| Null-conditional `logger?.` | `TestSendEmailService` passes `null` — avoids breaking existing tests |
 | Provider disposed by DI container | Host shutdown disposes registered providers. `AutoFlush` ensures logs are persisted even on unclean shutdown |
 | Remove log4net entirely | Single logging pipeline — all logs flow through `ILogger<T>` into console + file providers. No split behavior between frameworks |
 

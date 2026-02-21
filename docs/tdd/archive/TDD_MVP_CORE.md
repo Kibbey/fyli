@@ -166,13 +166,13 @@ public interface IMemoryShareLinkService
 ```csharp
 public class MemoryShareLinkService : IMemoryShareLinkService
 {
-    private readonly StreamContext _context;
-    private readonly IUserService _userService;
-    private readonly ISharingService _sharingService;
+    private readonly StreamContext context;
+    private readonly IUserService userService;
+    private readonly ISharingService sharingService;
 
     // RegisterAndConnectAsync delegates:
-    // 1. _userService.Register(email, name, acceptTerms) — or find existing
-    // 2. _sharingService.CreateConnection(creatorUserId, newUserId) — bidirectional
+    // 1. userService.Register(email, name, acceptTerms) — or find existing
+    // 2. sharingService.CreateConnection(creatorUserId, newUserId) — bidirectional
     // 3. UserWebToken.generateJwtToken(newUserId) — return JWT
 }
 ```
@@ -261,10 +261,10 @@ private async Task GrantDropAccessAsync(int viewerUserId, MemoryShareLink shareL
     if (viewerUserId == creatorUserId) return;
 
     // 1. Create bidirectional UserUser connection (no save yet — batched below)
-    await _sharingService.EnsureConnectionAsync(creatorUserId, viewerUserId, saveChanges: false);
+    await sharingService.EnsureConnectionAsync(creatorUserId, viewerUserId, saveChanges: false);
 
     // 2. Get the drop's tags
-    var tagIds = await _context.NetworkDrops
+    var tagIds = await context.NetworkDrops
         .Where(td => td.DropId == dropId)
         .Select(td => td.UserTagId)
         .ToListAsync();
@@ -273,15 +273,15 @@ private async Task GrantDropAccessAsync(int viewerUserId, MemoryShareLink shareL
     //    so the viewer can see it after PopulateEveryone adds them to that tag.
     if (!tagIds.Any())
     {
-        var allConnectionsTag = await _context.UserNetworks
+        var allConnectionsTag = await context.UserNetworks
             .SingleAsync(t => t.UserId == creatorUserId && t.Name == "All Connections");
 
-        bool alreadyTagged = await _context.NetworkDrops
+        bool alreadyTagged = await context.NetworkDrops
             .AnyAsync(td => td.DropId == dropId && td.UserTagId == allConnectionsTag.UserTagId);
 
         if (!alreadyTagged)
         {
-            _context.NetworkDrops.Add(new TagDrop
+            context.NetworkDrops.Add(new TagDrop
             {
                 DropId = dropId,
                 UserTagId = allConnectionsTag.UserTagId
@@ -292,14 +292,14 @@ private async Task GrantDropAccessAsync(int viewerUserId, MemoryShareLink shareL
     }
 
     // 4. Batch-check existing TagViewer records to avoid N+1 queries
-    var existingViewerTagIds = await _context.NetworkViewers
+    var existingViewerTagIds = await context.NetworkViewers
         .Where(nv => tagIds.Contains(nv.UserTagId) && nv.UserId == viewerUserId)
         .Select(nv => nv.UserTagId)
         .ToListAsync();
 
     foreach (var tagId in tagIds.Except(existingViewerTagIds))
     {
-        _context.NetworkViewers.Add(new TagViewer
+        context.NetworkViewers.Add(new TagViewer
         {
             UserTagId = tagId,
             UserId = viewerUserId
@@ -307,11 +307,11 @@ private async Task GrantDropAccessAsync(int viewerUserId, MemoryShareLink shareL
     }
 
     // 5. Single save for connection + TagViewer + TagDrop records
-    await _context.SaveChangesAsync();
+    await context.SaveChangesAsync();
 
     // 6. Sync "All Connections" tag for both users
-    await _groupService.PopulateEveryone(creatorUserId);
-    await _groupService.PopulateEveryone(viewerUserId);
+    await groupService.PopulateEveryone(creatorUserId);
+    await groupService.PopulateEveryone(viewerUserId);
 }
 ```
 

@@ -96,9 +96,9 @@ Add a second `Channel<EmailJob>` alongside the existing `Channel<NotificationJob
 ```csharp
 public class BackgroundJobQueue : IBackgroundJobQueue
 {
-    private readonly Channel<NotificationJob> _channel = ...;
+    private readonly Channel<NotificationJob> channel = ...;
 
-    private readonly Channel<EmailJob> _emailChannel =
+    private readonly Channel<EmailJob> emailChannel =
         Channel.CreateBounded<EmailJob>(new BoundedChannelOptions(1000)
         {
             FullMode = BoundedChannelFullMode.Wait
@@ -108,12 +108,12 @@ public class BackgroundJobQueue : IBackgroundJobQueue
 
     public async ValueTask EnqueueEmailAsync(EmailJob job)
     {
-        await _emailChannel.Writer.WriteAsync(job);
+        await emailChannel.Writer.WriteAsync(job);
     }
 
     public async ValueTask<EmailJob> DequeueEmailAsync(CancellationToken cancellationToken)
     {
-        return await _emailChannel.Reader.ReadAsync(cancellationToken);
+        return await emailChannel.Reader.ReadAsync(cancellationToken);
     }
 }
 ```
@@ -127,18 +127,18 @@ Same pattern as `NotificationJobProcessor` — fresh DI scope per job:
 ```csharp
 public class EmailJobProcessor : BackgroundService
 {
-    private readonly IBackgroundJobQueue _queue;
-    private readonly IServiceScopeFactory _scopeFactory;
-    private readonly ILogger<EmailJobProcessor> _logger;
+    private readonly IBackgroundJobQueue queue;
+    private readonly IServiceScopeFactory scopeFactory;
+    private readonly ILogger<EmailJobProcessor> logger;
 
     public EmailJobProcessor(
         IBackgroundJobQueue queue,
         IServiceScopeFactory scopeFactory,
         ILogger<EmailJobProcessor> logger)
     {
-        _queue = queue;
-        _scopeFactory = scopeFactory;
-        _logger = logger;
+        this.queue = queue;
+        this.scopeFactory = scopeFactory;
+        this.logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -147,13 +147,13 @@ public class EmailJobProcessor : BackgroundService
         {
             try
             {
-                var job = await _queue.DequeueEmailAsync(stoppingToken);
+                var job = await this.queue.DequeueEmailAsync(stoppingToken);
                 await ProcessJob(job);
             }
             catch (OperationCanceledException) { }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error processing email job");
+                logger.LogError(ex, "Error processing email job");
             }
         }
     }
@@ -162,14 +162,14 @@ public class EmailJobProcessor : BackgroundService
     {
         try
         {
-            using var scope = _scopeFactory.CreateScope();
+            using var scope = scopeFactory.CreateScope();
             var emailService = scope.ServiceProvider.GetRequiredService<SendEmailService>();
             var model = DictionaryToExpando(job.Model);
             await emailService.SendAsync(job.Email, job.EmailType, model);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send {EmailType} to {Email}", job.EmailType, job.Email);
+            logger.LogError(ex, "Failed to send {EmailType} to {Email}", job.EmailType, job.Email);
         }
     }
 
