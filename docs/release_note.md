@@ -1,5 +1,39 @@
 # Release Notes
 
+## 2026-02-21: Memory Date Precision
+
+### Overview
+
+Users can now assign flexible date precision when creating or editing memories. Instead of being forced to pick an exact date, users can choose Month & year, Year only, or Decade for older or approximate memories. All display surfaces now format dates based on the stored precision.
+
+### What Changed
+
+- **New utility** (`dateFormat.ts`): Shared `formatMemoryDate()` function with timezone-safe parsing, plus helpers for year/decade/month options
+- **New component** (`DatePrecisionSelector.vue`): Inline dropdown that adapts the date input based on selected precision (date picker, month+year selects, year select, or decade select)
+- **7 display surfaces updated**: MemoryCard, MemoryDetailView, SharedMemoryView, StorylineInviteView, AddExistingMemoryModal, QuestionAnswerCard, AnswerPreview now use `formatMemoryDate()` instead of raw `toLocaleDateString()`
+- **3 forms updated**: CreateMemoryView, EditMemoryView, and AnswerForm now include the precision selector and send the user's chosen `dateType` to the API (previously hardcoded to 0)
+
+### Display Formats
+
+| Precision | Example |
+|-----------|---------|
+| Exact date | December 24, 2023 |
+| Month & year | June 2019 |
+| Year only | 2015 |
+| Decade | 1950s |
+
+### Tests
+
+- 19 unit tests for dateFormat utility
+- 11 component tests for DatePrecisionSelector
+- All 686 frontend tests passing
+
+### Notes
+
+Frontend-only change. No backend or database modifications required — the `dateType` column already exists on the Drops table.
+
+---
+
 ## 2026-02-20: Fix Question Suggestion Prompt Priority
 
 ### Bug Fix
