@@ -1,5 +1,48 @@
 # Release Notes
 
+## 2026-02-21: Help Me Write (AI Writing Assist)
+
+### New Feature
+
+**AI-Powered Writing Polish**
+Users can now get help turning rough notes, bullet points, and messy drafts into well-written memories. A "Help me write" button appears below the text area on Create Memory, Edit Memory, and Question Answer forms. The AI preserves all original facts while improving grammar, flow, and readability, matching the user's writing voice from previous memories.
+
+### How It Works
+
+1. User writes rough text in any memory form
+2. Clicks "Help me write" button
+3. AI returns polished version with review mode highlighting
+4. User can **Accept** the suggestion or **Undo** to restore their original text
+5. Memories created with AI assist are flagged with `assisted: true`
+
+### Backend Changes
+
+- **WritingAssistService**: New service inheriting BaseService with voice sample matching (3 most recent memories), optional question/storyline context, rate limiting (daily per-user via CacheEntry), and prompt injection defense
+- **Drop entity**: Added `Assisted` boolean column to track AI-assisted memories
+- **DropController**: New `POST /api/drops/assist` endpoint with `[EnableRateLimiting("ai")]`
+- **QuestionService**: `SubmitAnswer` extended with `assisted` parameter
+- **EF Core migration**: `AddDropAssisted` — adds nullable bit column
+
+### Frontend Changes
+
+- **WritingAssistButton.vue**: Reusable component with three states (idle, polishing, review mode)
+- **useWritingAssist.ts**: Composable managing state machine (Idle → Polishing → Review → Idle)
+- **writingAssistApi.ts**: API service for `POST /drops/assist`
+- **CreateMemoryView**: Integrated with optional storyline context
+- **EditMemoryView**: Integrated (no storyline context needed)
+- **AnswerForm**: Integrated with question context for answer polishing
+
+### Tests
+
+- 13 backend tests (WritingAssistService: happy path, validation, voice samples, response cleaning, rate limiting, AI failure)
+- 10 composable tests (useWritingAssist: state transitions, error handling, assistUsed flag)
+- 10 component tests (WritingAssistButton: rendering, emits, states)
+- 2 API service tests (writingAssistApi: endpoint verification)
+- Updated 3 existing test files with useWritingAssist mocks
+- **Total: 708 frontend tests passing**
+
+---
+
 ## 2026-02-21: Memory Date Precision
 
 ### Overview
