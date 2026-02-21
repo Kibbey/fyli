@@ -66,8 +66,8 @@ New test class dedicated to end-to-end feed visibility flows.
 public async Task InvitationConnect_ShareToAllConnections_BothUsersSeeDropInFeed()
 {
     // Arrange: Create two users
-    var userA = await CreateTestUser(_context, name: "Alice");
-    var userB = await CreateTestUser(_context, name: "Bob");
+    var userA = await CreateTestUser(context, name: "Alice");
+    var userB = await CreateTestUser(context, name: "Bob");
 
     // Create a share request from A to B
     var request = new ShareRequest
@@ -84,9 +84,9 @@ public async Task InvitationConnect_ShareToAllConnections_BothUsersSeeDropInFeed
         CreatedAt = DateTime.UtcNow,
         UpdatedAt = DateTime.UtcNow
     };
-    _context.ShareRequests.Add(request);
-    await _context.SaveChangesAsync();
-    DetachAllEntities(_context);
+    context.ShareRequests.Add(request);
+    await context.SaveChangesAsync();
+    DetachAllEntities(context);
 
     // Act 1: UserB accepts the invitation (creates bidirectional connection)
     await sharingService.ConfirmationSharingRequest(
@@ -95,8 +95,8 @@ public async Task InvitationConnect_ShareToAllConnections_BothUsersSeeDropInFeed
     // ConfirmationSharingRequest only calls PopulateEveryone for the acceptor (B).
     // In the real app, A's groups get populated when A loads their groups.
     // Simulate this by calling AllGroups for both users.
-    var groupsA = await _groupService.AllGroups(userA.UserId);
-    await _groupService.AllGroups(userB.UserId);
+    var groupsA = await groupService.AllGroups(userA.UserId);
+    await groupService.AllGroups(userB.UserId);
 
     // Act 2: UserA creates a drop tagged to "All Connections"
     var allConnectionsTagA = groupsA
@@ -108,19 +108,19 @@ public async Task InvitationConnect_ShareToAllConnections_BothUsersSeeDropInFeed
         DateType = DateTypes.Exact,
         Content = new ContentModel { Stuff = "Alice's memory" }
     };
-    var (dropIdA, _) = await _dropsService.Add(
+    var (dropIdA, _) = await dropsService.Add(
         dropModelA, new List<long> { allConnectionsTagA },
         userA.UserId, new List<int>());
 
     // Assert: UserB can see UserA's drop
-    Assert.IsTrue(_dropsService.CanView(userB.UserId, dropIdA),
+    Assert.IsTrue(dropsService.CanView(userB.UserId, dropIdA),
         "UserB should see UserA's drop shared to All Connections after invitation connect");
 
     // Assert: UserA can see own drop (owner always sees own drops)
-    Assert.IsTrue(_dropsService.CanView(userA.UserId, dropIdA));
+    Assert.IsTrue(dropsService.CanView(userA.UserId, dropIdA));
 
     // Act 3: UserB creates a drop tagged to "All Connections" (bidirectional test)
-    var groupsB = await _groupService.AllGroups(userB.UserId);
+    var groupsB = await groupService.AllGroups(userB.UserId);
     var allConnectionsTagB = groupsB
         .Single(g => g.Name == "All Connections").TagId;
 
@@ -130,12 +130,12 @@ public async Task InvitationConnect_ShareToAllConnections_BothUsersSeeDropInFeed
         DateType = DateTypes.Exact,
         Content = new ContentModel { Stuff = "Bob's memory" }
     };
-    var (dropIdB, _) = await _dropsService.Add(
+    var (dropIdB, _) = await dropsService.Add(
         dropModelB, new List<long> { allConnectionsTagB },
         userB.UserId, new List<int>());
 
     // Assert: UserA can see UserB's drop (bidirectional)
-    Assert.IsTrue(_dropsService.CanView(userA.UserId, dropIdB),
+    Assert.IsTrue(dropsService.CanView(userA.UserId, dropIdB),
         "UserA should see UserB's drop shared to All Connections after invitation connect");
 }
 ```
@@ -147,11 +147,11 @@ public async Task InvitationConnect_ShareToAllConnections_BothUsersSeeDropInFeed
 public async Task ShareLinkConnect_ShareToAllConnections_BothUsersSeeDropInFeed()
 {
     // Arrange: Creator creates a drop shared to "All Connections"
-    var creator = await CreateTestUser(_context, name: "Creator");
-    var viewer = await CreateTestUser(_context, name: "Viewer");
+    var creator = await CreateTestUser(context, name: "Creator");
+    var viewer = await CreateTestUser(context, name: "Viewer");
 
     // Create "All Connections" group for creator via service
-    var creatorGroups = await _groupService.AllGroups(creator.UserId);
+    var creatorGroups = await groupService.AllGroups(creator.UserId);
     var allConnTagId = creatorGroups
         .Single(g => g.Name == "All Connections").TagId;
 
@@ -162,19 +162,19 @@ public async Task ShareLinkConnect_ShareToAllConnections_BothUsersSeeDropInFeed(
         DateType = DateTypes.Exact,
         Content = new ContentModel { Stuff = "Shared via link" }
     };
-    var (initialDropId, _) = await _dropsService.Add(
+    var (initialDropId, _) = await dropsService.Add(
         initialDropModel, new List<long> { allConnTagId },
         creator.UserId, new List<int>());
 
     // Act 1: Creator creates a share link and viewer claims it
     // ClaimDropAccessAsync → GrantDropAccessAsync calls PopulateEveryone
     // for BOTH users, so no additional AllGroups calls needed
-    var token = await _shareLinkService.CreateLinkAsync(
+    var token = await shareLinkService.CreateLinkAsync(
         creator.UserId, initialDropId);
-    await _shareLinkService.ClaimDropAccessAsync(token, viewer.UserId);
+    await shareLinkService.ClaimDropAccessAsync(token, viewer.UserId);
 
     // Assert: Viewer can see the initially shared drop
-    Assert.IsTrue(_dropsService.CanView(viewer.UserId, initialDropId),
+    Assert.IsTrue(dropsService.CanView(viewer.UserId, initialDropId),
         "Viewer should see the drop they claimed via share link");
 
     // Act 2: Creator creates a NEW drop tagged to "All Connections"
@@ -184,18 +184,18 @@ public async Task ShareLinkConnect_ShareToAllConnections_BothUsersSeeDropInFeed(
         DateType = DateTypes.Exact,
         Content = new ContentModel { Stuff = "Creator's new memory" }
     };
-    var (newDropId, _) = await _dropsService.Add(
+    var (newDropId, _) = await dropsService.Add(
         newDropModel, new List<long> { allConnTagId },
         creator.UserId, new List<int>());
 
     // Assert: Viewer can see the NEW drop (connection gives ongoing access)
-    Assert.IsTrue(_dropsService.CanView(viewer.UserId, newDropId),
+    Assert.IsTrue(dropsService.CanView(viewer.UserId, newDropId),
         "Viewer should see creator's new drops shared to All Connections after share link connect");
 
     // Act 3: Viewer creates a drop tagged to their "All Connections" (bidirectional)
     // PopulateEveryone was called for viewer during ClaimDropAccessAsync,
     // so viewer's "All Connections" exists and has creator as TagViewer
-    var viewerGroups = await _groupService.AllGroups(viewer.UserId);
+    var viewerGroups = await groupService.AllGroups(viewer.UserId);
     var viewerAllConnTagId = viewerGroups
         .Single(g => g.Name == "All Connections").TagId;
 
@@ -205,12 +205,12 @@ public async Task ShareLinkConnect_ShareToAllConnections_BothUsersSeeDropInFeed(
         DateType = DateTypes.Exact,
         Content = new ContentModel { Stuff = "Viewer's memory" }
     };
-    var (viewerDropId, _) = await _dropsService.Add(
+    var (viewerDropId, _) = await dropsService.Add(
         viewerDropModel, new List<long> { viewerAllConnTagId },
         viewer.UserId, new List<int>());
 
     // Assert: Creator can see viewer's drop (bidirectional)
-    Assert.IsTrue(_dropsService.CanView(creator.UserId, viewerDropId),
+    Assert.IsTrue(dropsService.CanView(creator.UserId, viewerDropId),
         "Creator should see viewer's drops shared to All Connections after share link connect");
 }
 ```
@@ -222,9 +222,9 @@ public async Task ShareLinkConnect_ShareToAllConnections_BothUsersSeeDropInFeed(
 public async Task InvitationConnect_ShareToSpecificUserGroup_OnlyTargetSees()
 {
     // Arrange: Three users - A connects with B and C
-    var userA = await CreateTestUser(_context, name: "Alice");
-    var userB = await CreateTestUser(_context, name: "Bob");
-    var userC = await CreateTestUser(_context, name: "Charlie");
+    var userA = await CreateTestUser(context, name: "Alice");
+    var userB = await CreateTestUser(context, name: "Bob");
+    var userC = await CreateTestUser(context, name: "Charlie");
 
     // Connect A↔B via invitation
     var requestAB = new ShareRequest
@@ -241,7 +241,7 @@ public async Task InvitationConnect_ShareToSpecificUserGroup_OnlyTargetSees()
         CreatedAt = DateTime.UtcNow,
         UpdatedAt = DateTime.UtcNow
     };
-    _context.ShareRequests.Add(requestAB);
+    context.ShareRequests.Add(requestAB);
 
     // Connect A↔C via invitation
     var requestAC = new ShareRequest
@@ -258,9 +258,9 @@ public async Task InvitationConnect_ShareToSpecificUserGroup_OnlyTargetSees()
         CreatedAt = DateTime.UtcNow,
         UpdatedAt = DateTime.UtcNow
     };
-    _context.ShareRequests.Add(requestAC);
-    await _context.SaveChangesAsync();
-    DetachAllEntities(_context);
+    context.ShareRequests.Add(requestAC);
+    await context.SaveChangesAsync();
+    DetachAllEntities(context);
 
     await sharingService.ConfirmationSharingRequest(
         requestAB.RequestKey.ToString(), userB.UserId, "Alice");
@@ -268,8 +268,8 @@ public async Task InvitationConnect_ShareToSpecificUserGroup_OnlyTargetSees()
         requestAC.RequestKey.ToString(), userC.UserId, "Alice");
 
     // Act: Create a custom group for Bob and share a drop only with Bob
-    var bobGroup = _groupService.Add("Just Bob", userA.UserId);
-    await _groupService.UpdateNetworkViewers(
+    var bobGroup = groupService.Add("Just Bob", userA.UserId);
+    await groupService.UpdateNetworkViewers(
         userA.UserId, bobGroup, new List<int> { userB.UserId });
 
     var dropModel = new DropModel
@@ -278,20 +278,20 @@ public async Task InvitationConnect_ShareToSpecificUserGroup_OnlyTargetSees()
         DateType = DateTypes.Exact,
         Content = new ContentModel { Stuff = "Only for Bob" }
     };
-    var (dropId, _) = await _dropsService.Add(
+    var (dropId, _) = await dropsService.Add(
         dropModel, new List<long> { bobGroup },
         userA.UserId, new List<int>());
 
     // Assert: Bob can see it
-    Assert.IsTrue(_dropsService.CanView(userB.UserId, dropId),
+    Assert.IsTrue(dropsService.CanView(userB.UserId, dropId),
         "Bob should see drop shared to his specific group");
 
     // Assert: Charlie cannot see it
-    Assert.IsFalse(_dropsService.CanView(userC.UserId, dropId),
+    Assert.IsFalse(dropsService.CanView(userC.UserId, dropId),
         "Charlie should NOT see drop shared only to Bob's group");
 
     // Assert: Alice (owner) can always see it
-    Assert.IsTrue(_dropsService.CanView(userA.UserId, dropId));
+    Assert.IsTrue(dropsService.CanView(userA.UserId, dropId));
 }
 ```
 
@@ -302,9 +302,9 @@ public async Task InvitationConnect_ShareToSpecificUserGroup_OnlyTargetSees()
 public async Task UnconnectedUser_CannotSeeSharedDrops()
 {
     // Arrange: UserA and UserB are connected; UserC is not connected to anyone
-    var userA = await CreateTestUser(_context, name: "Alice");
-    var userB = await CreateTestUser(_context, name: "Bob");
-    var userC = await CreateTestUser(_context, name: "Charlie");
+    var userA = await CreateTestUser(context, name: "Alice");
+    var userB = await CreateTestUser(context, name: "Bob");
+    var userC = await CreateTestUser(context, name: "Charlie");
 
     var request = new ShareRequest
     {
@@ -320,17 +320,17 @@ public async Task UnconnectedUser_CannotSeeSharedDrops()
         CreatedAt = DateTime.UtcNow,
         UpdatedAt = DateTime.UtcNow
     };
-    _context.ShareRequests.Add(request);
-    await _context.SaveChangesAsync();
-    DetachAllEntities(_context);
+    context.ShareRequests.Add(request);
+    await context.SaveChangesAsync();
+    DetachAllEntities(context);
 
     await sharingService.ConfirmationSharingRequest(
         request.RequestKey.ToString(), userB.UserId, "Alice");
 
     // Populate groups for both users
     // (ConfirmationSharingRequest only populates acceptor)
-    var groupsA = await _groupService.AllGroups(userA.UserId);
-    await _groupService.AllGroups(userB.UserId);
+    var groupsA = await groupService.AllGroups(userA.UserId);
+    await groupService.AllGroups(userB.UserId);
 
     // Act: UserA creates a drop shared to "All Connections"
     var allConnectionsTagId = groupsA
@@ -342,15 +342,15 @@ public async Task UnconnectedUser_CannotSeeSharedDrops()
         DateType = DateTypes.Exact,
         Content = new ContentModel { Stuff = "Shared memory" }
     };
-    var (dropId, _) = await _dropsService.Add(
+    var (dropId, _) = await dropsService.Add(
         dropModel, new List<long> { allConnectionsTagId },
         userA.UserId, new List<int>());
 
     // Assert: Connected UserB sees it
-    Assert.IsTrue(_dropsService.CanView(userB.UserId, dropId));
+    Assert.IsTrue(dropsService.CanView(userB.UserId, dropId));
 
     // Assert: Unconnected UserC does NOT see it
-    Assert.IsFalse(_dropsService.CanView(userC.UserId, dropId),
+    Assert.IsFalse(dropsService.CanView(userC.UserId, dropId),
         "Unconnected user should NOT see drops shared to All Connections");
 }
 ```
@@ -362,8 +362,8 @@ public async Task UnconnectedUser_CannotSeeSharedDrops()
 public async Task PrivateDrop_NotVisibleToConnection_UntilShared()
 {
     // Arrange: Connect A↔B
-    var userA = await CreateTestUser(_context, name: "Alice");
-    var userB = await CreateTestUser(_context, name: "Bob");
+    var userA = await CreateTestUser(context, name: "Alice");
+    var userB = await CreateTestUser(context, name: "Bob");
 
     var request = new ShareRequest
     {
@@ -379,9 +379,9 @@ public async Task PrivateDrop_NotVisibleToConnection_UntilShared()
         CreatedAt = DateTime.UtcNow,
         UpdatedAt = DateTime.UtcNow
     };
-    _context.ShareRequests.Add(request);
-    await _context.SaveChangesAsync();
-    DetachAllEntities(_context);
+    context.ShareRequests.Add(request);
+    await context.SaveChangesAsync();
+    DetachAllEntities(context);
 
     await sharingService.ConfirmationSharingRequest(
         request.RequestKey.ToString(), userB.UserId, "Alice");
@@ -393,16 +393,16 @@ public async Task PrivateDrop_NotVisibleToConnection_UntilShared()
         DateType = DateTypes.Exact,
         Content = new ContentModel { Stuff = "Private thought" }
     };
-    var (dropId, _) = await _dropsService.Add(
+    var (dropId, _) = await dropsService.Add(
         dropModel, new List<long>(),
         userA.UserId, new List<int>());
 
     // Assert: UserB cannot see the private drop
-    Assert.IsFalse(_dropsService.CanView(userB.UserId, dropId),
+    Assert.IsFalse(dropsService.CanView(userB.UserId, dropId),
         "Connected user should NOT see private (untagged) drops");
 
     // Assert: UserA can see own private drop
-    Assert.IsTrue(_dropsService.CanView(userA.UserId, dropId));
+    Assert.IsTrue(dropsService.CanView(userA.UserId, dropId));
 }
 ```
 
@@ -419,9 +419,9 @@ The test class needs multiple services that share contexts:
 public class FeedVisibilityTest : BaseRepositoryTest
 {
     private SharingService sharingService;
-    private DropsService _dropsService;
-    private GroupService _groupService;
-    private MemoryShareLinkService _shareLinkService;
+    private DropsService dropsService;
+    private GroupService groupService;
+    private MemoryShareLinkService shareLinkService;
 
     [TestInitialize]
     public void Setup()
@@ -430,31 +430,31 @@ public class FeedVisibilityTest : BaseRepositoryTest
             ?? "Server=localhost,1433; Database=Master; User Id=SA; Password=Dog1$Dobbie!; Encrypt=False;";
         Environment.SetEnvironmentVariable("DatabaseConnection", connectionString);
 
-        _context = CreateTestContext();
+        this.context = CreateTestContext();
 
         // Wire services with a non-null logger for NotificationService.
         // Default factory passes null, which throws when DropsService.Add
         // triggers AddNotificationDropAdded and an exception is caught/logged.
         var sendEmailService = TestServiceFactory.CreateSendEmailService();
-        _groupService = TestServiceFactory.CreateGroupService(sendEmailService);
+        this.groupService = TestServiceFactory.CreateGroupService(sendEmailService);
         var notificationService = TestServiceFactory.CreateNotificationService(
-            sendEmailService, _groupService, new NullLogger<NotificationService>());
-        _dropsService = TestServiceFactory.CreateDropsService(
-            sendEmailService, notificationService, null, _groupService);
-        sharingService = TestServiceFactory.CreateSharingService(
-            sendEmailService, notificationService, _groupService);
-        _shareLinkService = TestServiceFactory.CreateMemoryShareLinkService(
-            sharingService, _groupService);
+            sendEmailService, groupService, new NullLogger<NotificationService>());
+        this.dropsService = TestServiceFactory.CreateDropsService(
+            sendEmailService, notificationService, null, groupService);
+        this.sharingService = TestServiceFactory.CreateSharingService(
+            sendEmailService, notificationService, groupService);
+        this.shareLinkService = TestServiceFactory.CreateMemoryShareLinkService(
+            sharingService, groupService);
     }
 
     [TestCleanup]
     public void Cleanup()
     {
         sharingService?.Dispose();
-        _dropsService?.Dispose();
-        _groupService?.Dispose();
-        _shareLinkService?.Dispose();
-        _context?.Dispose();
+        dropsService?.Dispose();
+        groupService?.Dispose();
+        shareLinkService?.Dispose();
+        context?.Dispose();
     }
 }
 ```

@@ -51,7 +51,7 @@ All backend repository tests extend `BaseRepositoryTest` which provides:
 
 - **Transaction-based isolation**: Each test runs in a transaction that's rolled back on cleanup
 - **Shared test helpers**: `CreateTestUser`, `CreateTestDrop`, `CreateTestComment`, etc.
-- **Context management**: `_context` field with `InitializeWithTransaction()` and `CleanupWithTransaction()`
+- **Context management**: `context` field with `InitializeWithTransaction()` and `CleanupWithTransaction()`
 
 ```csharp
 // Example test class structure
@@ -65,7 +65,7 @@ public class QuestionServiceTest : BaseRepositoryTest
     {
         InitializeWithTransaction();  // Creates context, starts transaction
         questionService = TestServiceFactory.CreateQuestionService();
-        questionService.Context = _context;
+        questionService.Context = context;
     }
 
     [TestCleanup]
@@ -74,7 +74,7 @@ public class QuestionServiceTest : BaseRepositoryTest
         CleanupWithTransaction();  // Rolls back transaction, disposes context
     }
 
-    // Tests use _context and BaseRepositoryTest helpers
+    // Tests use context and BaseRepositoryTest helpers
 }
 ```
 
@@ -147,7 +147,7 @@ public class QuestionServiceTest : BaseRepositoryTest
 
         // Create service with test context
         questionService = TestServiceFactory.CreateQuestionService();
-        questionService.Context = _context;
+        questionService.Context = context;
     }
 
     [TestCleanup]
@@ -161,7 +161,7 @@ public class QuestionServiceTest : BaseRepositoryTest
     public async Task CreateQuestionSet_Valid_ReturnsSetWithQuestions()
     {
         // Arrange - use BaseRepositoryTest helper
-        var user = await CreateTestUser(_context);
+        var user = await CreateTestUser(context);
         var questions = new List<string> { "Question 1?", "Question 2?" };
 
         // Act
@@ -179,7 +179,7 @@ public class QuestionServiceTest : BaseRepositoryTest
     [ExpectedException(typeof(BadRequestException))]
     public async Task CreateQuestionSet_TooManyQuestions_ThrowsBadRequest()
     {
-        var user = await CreateTestUser(_context);
+        var user = await CreateTestUser(context);
         var questions = new List<string> { "Q1?", "Q2?", "Q3?", "Q4?", "Q5?", "Q6?" };
 
         await questionService.CreateQuestionSet(user.UserId, "Test", questions);
@@ -189,7 +189,7 @@ public class QuestionServiceTest : BaseRepositoryTest
     [ExpectedException(typeof(BadRequestException))]
     public async Task CreateQuestionSet_EmptyName_ThrowsBadRequest()
     {
-        var user = await CreateTestUser(_context);
+        var user = await CreateTestUser(context);
         await questionService.CreateQuestionSet(user.UserId, "", new List<string> { "Q?" });
     }
 
@@ -285,16 +285,16 @@ public async Task CanView_UserHasUserDropAccess_ReturnsTrue()
     // Arrange - uses BaseRepositoryTest helpers
     InitializeWithTransaction();
 
-    var owner = await CreateTestUser(_context);
-    var viewer = await CreateTestUser(_context);
-    var drop = await CreateTestDrop(_context, owner.UserId);
+    var owner = await CreateTestUser(context);
+    var viewer = await CreateTestUser(context);
+    var drop = await CreateTestDrop(context, owner.UserId);
 
     // Grant access via UserDrop
-    _context.UserDrops.Add(new UserDrop { DropId = drop.DropId, UserId = viewer.UserId });
-    await _context.SaveChangesAsync();
+    context.UserDrops.Add(new UserDrop { DropId = drop.DropId, UserId = viewer.UserId });
+    await context.SaveChangesAsync();
 
     var permissionService = new PermissionService();
-    permissionService.Context = _context;
+    permissionService.Context = context;
 
     // Act
     var canView = permissionService.CanView(viewer.UserId, drop.DropId);
@@ -345,7 +345,7 @@ public class QuestionReminderJobTest : BaseRepositoryTest
         reminderJob = new QuestionReminderJob(
             mockEmailService.Object,
             new NullLogger<QuestionReminderJob>());
-        reminderJob.Context = _context;
+        reminderJob.Context = context;
     }
 
     [TestCleanup]
@@ -359,14 +359,14 @@ public class QuestionReminderJobTest : BaseRepositoryTest
     public async Task ProcessReminders_Day7_SendsFirstReminder()
     {
         // Arrange
-        var user = await CreateTestUser(_context);
-        var qs = QuestionTestFixtures.CreateQuestionSet(_context, user.UserId);
-        var request = QuestionTestFixtures.CreateQuestionRequest(_context, qs.QuestionSetId, user.UserId);
-        var recipient = QuestionTestFixtures.CreateRecipient(_context, request);
+        var user = await CreateTestUser(context);
+        var qs = QuestionTestFixtures.CreateQuestionSet(context, user.UserId);
+        var request = QuestionTestFixtures.CreateQuestionRequest(context, qs.QuestionSetId, user.UserId);
+        var recipient = QuestionTestFixtures.CreateRecipient(context, request);
 
         // Set created date to 8 days ago
         recipient.CreatedAt = DateTime.UtcNow.AddDays(-8);
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
 
         // Act
         await reminderJob.ProcessReminders();
@@ -379,7 +379,7 @@ public class QuestionReminderJobTest : BaseRepositoryTest
                 It.IsAny<object>()),
             Times.Once);
 
-        await _context.Entry(recipient).ReloadAsync();
+        await context.Entry(recipient).ReloadAsync();
         Assert.AreEqual(1, recipient.RemindersSent);
         Assert.IsNotNull(recipient.LastReminderAt);
     }
@@ -388,17 +388,17 @@ public class QuestionReminderJobTest : BaseRepositoryTest
     public async Task ProcessReminders_CompleteAnswers_Skipped()
     {
         // Arrange
-        var user = await CreateTestUser(_context);
-        var qs = QuestionTestFixtures.CreateQuestionSet(_context, user.UserId);
-        var request = QuestionTestFixtures.CreateQuestionRequest(_context, qs.QuestionSetId, user.UserId);
-        var recipient = QuestionTestFixtures.CreateRecipient(_context, request);
+        var user = await CreateTestUser(context);
+        var qs = QuestionTestFixtures.CreateQuestionSet(context, user.UserId);
+        var request = QuestionTestFixtures.CreateQuestionRequest(context, qs.QuestionSetId, user.UserId);
+        var recipient = QuestionTestFixtures.CreateRecipient(context, request);
         recipient.CreatedAt = DateTime.UtcNow.AddDays(-8);
 
         // Answer all questions
         foreach (var question in qs.Questions)
         {
-            var drop = await CreateTestDrop(_context, user.UserId);
-            _context.QuestionResponses.Add(new QuestionResponse
+            var drop = await CreateTestDrop(context, user.UserId);
+            context.QuestionResponses.Add(new QuestionResponse
             {
                 QuestionRequestRecipientId = recipient.QuestionRequestRecipientId,
                 QuestionId = question.QuestionId,
@@ -406,7 +406,7 @@ public class QuestionReminderJobTest : BaseRepositoryTest
                 AnsweredAt = DateTime.UtcNow
             });
         }
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
 
         // Act
         await reminderJob.ProcessReminders();
