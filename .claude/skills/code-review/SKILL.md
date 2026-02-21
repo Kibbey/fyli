@@ -55,6 +55,7 @@ All backend changes must be 100% backwards compatible for drops (memories) and a
 - [ ] Explicit types for refs
 - [ ] Interfaces for API responses and store state
 - [ ] Does the project build (npm run build) with no errors?
+- [ ] !IMPORTANT! **Strict indexed access safety:** Array element access (e.g. `arr[i]`, `str.split("x")[0]`) returns `T | undefined` under `noUncheckedIndexedAccess`. All such accesses must use a non-null assertion (`!`), nullish coalescing (`??`), or a guard check before use. Run `npx vue-tsc --noEmit` to catch these — do NOT rely on `vite build` alone, as Vite skips type checking.
 
 **Backend (C#):**
 - [ ] Request/Response DTOs defined
