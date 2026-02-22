@@ -56,6 +56,7 @@ All backend changes must be 100% backwards compatible for drops (memories) and a
 - [ ] Interfaces for API responses and store state
 - [ ] Does the project build (npm run build) with no errors?
 - [ ] !IMPORTANT! **Strict indexed access safety:** Array element access (e.g. `arr[i]`, `str.split("x")[0]`) returns `T | undefined` under `noUncheckedIndexedAccess`. All such accesses must use a non-null assertion (`!`), nullish coalescing (`??`), or a guard check before use. Run `npx vue-tsc --noEmit` to catch these — do NOT rely on `vite build` alone, as Vite skips type checking.
+- [ ] !IMPORTANT! **Test fixture type completeness:** When new required properties are added to shared types (e.g. `Drop`, `User`), verify that test fixture factories in `src/test/fixtures.ts` include defaults for the new fields. `Partial<T>` spreads can leave required properties as `undefined`, causing `vue-tsc` failures. Always run `npx vue-tsc --noEmit` after adding properties to shared types.
 
 **Backend (C#):**
 - [ ] Request/Response DTOs defined
