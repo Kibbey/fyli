@@ -1,5 +1,54 @@
 # Release Notes
 
+## 2026-02-28: Onboarding Experience
+
+### New Feature
+
+**Guided First Moment Flow**
+New users are now guided through creating their first memory in under 60 seconds instead of landing on an empty stream. The flow walks users through: Welcome screen, prompt selection (pick from 3 family-focused prompts or write your own), quick text capture with optional photo/video, AI polish with side-by-side comparison, and a celebration screen.
+
+**Getting Started Missions**
+After the First Moment flow, users see a mission card on their stream with three optional tasks: Start a Storyline, Ask a Question, and Share a Memory. Missions auto-complete when the user performs the action anywhere in the app. The card can be dismissed and resumed, and auto-expires after 30 days.
+
+### How It Works
+
+1. User registers and completes profile
+2. Backend initializes `OnboardingState` JSON on the user profile
+3. Router guard redirects to `/onboarding/first-moment`
+4. User picks a prompt, writes a moment, gets AI polish, saves
+5. Backend marks `firstMomentCompletedAt` and user lands on their stream
+6. MissionCard appears showing the next mission to try
+7. Completing a storyline, question, or share link triggers mission completion
+8. Card auto-dismisses after all 3 missions are done or after 30 days
+
+### Backend Changes
+
+- **OnboardingStateModel**: New domain model stored as JSON varchar(1000) on UserProfile
+- **UserService**: Added `InitializeOnboarding`, `InitializeOnboardingAsync`, `UpdateOnboardingAsync`, `TryCompleteMissionAsync` with dictionary-based action handler pattern
+- **UserController**: New `PUT /api/users/onboarding` endpoint
+- **Mission triggers**: `TimelineService.AddTimeline`, `QuestionService.CreateQuestionSet`, `MemoryShareLinkService.CreateLinkAsync` call `TryCompleteMissionAsync`
+- **Removed**: `AddHelloWorldDrop` method and all references; removed `DropsService` from `GoogleAuthService`, `UserController`, `TimelineShareLinkService` constructors
+- **EF Core migration**: `AddOnboardingState` with production SQL script
+
+### Frontend Changes
+
+- **FirstMomentView.vue**: 5-step multi-step flow (Welcome, Prompts, Capture, Polish, Celebrate) using v-show for snappy transitions
+- **MissionCard.vue**: Stream-top card with mission progress, dismiss/resume, toast notifications, 30-day expiry
+- **onboardingApi.ts**: API service for `PUT /users/onboarding`
+- **auth store**: Added `needsFirstMoment` and `onboardingState` computed properties
+- **Router**: First Moment guard, replaced old onboarding routes with single `/onboarding/first-moment`
+- **WelcomeView**: Routes to First Moment flow after profile completion
+- **StreamView**: Added MissionCard component
+
+### Tests
+
+- 12 backend integration tests (UserService: onboarding lifecycle, missions, actions)
+- 8 FirstMomentView component tests (step navigation, API calls, save flow)
+- 6 MissionCard component tests (visibility, dismiss/resume, expiry)
+- **Total: 41 backend UserService tests + 722 frontend tests passing**
+
+---
+
 ## 2026-02-21: Help Me Write (AI Writing Assist)
 
 ### New Feature
