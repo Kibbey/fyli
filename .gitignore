@@ -4,3 +4,6 @@ fyli-fe-v2/
 fyli-infra/
 fyli-html/
 node_modules/
+
+# dotnet ef build artifacts when run from repo root
+obj/

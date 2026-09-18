@@ -196,6 +196,9 @@ The `StreamContext` defines 40+ DbSets. The core domain model is user-centric:
 - **Prompt / UserPrompt / PromptTimeline** — drop creation workflows
 - **QuestionSet / Question / QuestionRequest / QuestionRequestRecipient / QuestionResponse** — survey system
 - **ExternalLogin** — OAuth providers (Google)
+- **UserRole** — additive roles (`admin`); users with no rows are normal users
+- **Ask** — in-product ask/bug submissions from Account
+- **AdminAudit** — admin email-change history and dispute tokens
 - **PremiumPlan / SharedPlan / Transaction** — subscriptions and billing
 
 ## Migration History
@@ -209,3 +212,6 @@ The `StreamContext` defines 40+ DbSets. The core domain model is user-centric:
 | 20260209005943 | AddExternalLogin |
 | 20260210222732 | AddTimelineShareLinks |
 | 20260219192308 | AddCacheEntry (AI suggestion rate limiting) |
+| 20260918015825 | AddUserRole |
+| 20260918015900 | AddAsk |
+| 20260918020101 | AddAdminAudit |
