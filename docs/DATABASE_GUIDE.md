@@ -215,3 +215,4 @@ The `StreamContext` defines 40+ DbSets. The core domain model is user-centric:
 | 20260918015825 | AddUserRole |
 | 20260918015900 | AddAsk |
 | 20260918020101 | AddAdminAudit |
+| 20260918032350 | AddDropSortIndexes (Drops.Created, Drops.Date — RESOURCE_SEMAPHORE fix) |

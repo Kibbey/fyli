@@ -1,6 +1,6 @@
 # Investigation: Production GetTimeline SQL Timeout
 
-**Status:** 🔴 **STILL OPEN — Round 5's conclusion was falsified in production (Round 6).** The union rewrite shipped and the feed still times out. Reopened 2026-09-17; — production telemetry shows the underlying condition was never fixed, only pushed below the 30s timeout. See Round 3, then **Round 4 (infrastructure)**, which corrects a wrong diagnosis made mid-Round-4 and is the current state.
+**Status:** 🟢 **ROOT CAUSE IDENTIFIED (Round 7): `RESOURCE_SEMAPHORE` — query memory grant starvation.** First explanation that accounts for every observation. Fix migration `20260918032350_AddDropSortIndexes` written, not yet applied to prod. Reopened 2026-09-17; — production telemetry shows the underlying condition was never fixed, only pushed below the 30s timeout. See Round 3, then **Round 4 (infrastructure)**, which corrects a wrong diagnosis made mid-Round-4 and is the current state.
 **Date opened:** 2026-09-09
 **Date resolved:** ~~2026-09-09~~ — reopened
 
@@ -754,6 +754,88 @@ It is simply not sufficient, because the binding constraint is something else.
 - **Lesson:** three confident diagnoses in this investigation have now been falsified (missing
   indexes as root cause; CPU throttling; query shape as binding constraint). Each was measured but
   measured the wrong thing. Establish the wait type before the next change.
+
+---
+
+## Round 7 — ROOT CAUSE: query memory grant starvation (2026-09-17)
+
+`sys.dm_exec_requests` during a slow period:
+
+| session | blocking_session_id | wait_type | wait_time | status | command |
+|---|---|---|---|---|---|
+| 54 | 0 | **RESOURCE_SEMAPHORE** | 21829 | suspended | DELETE |
+| 55 | 0 | **RESOURCE_SEMAPHORE** | 21804 | suspended | SELECT |
+| 69 | 0 | NULL | 0 | running | SELECT |
+| 72 | 0 | **RESOURCE_SEMAPHORE** | 24282 | suspended | SELECT |
+
+`RESOURCE_SEMAPHORE` = the query is **suspended before it begins executing**, queueing for a memory
+grant. SQL Server sizes the grant up front from the optimizer's estimate; if the pool cannot satisfy
+it, the query waits.
+
+### This is the first explanation that accounts for everything
+
+| Observation | Explained |
+|---|---|
+| Unrelated queries at an identical ~25s | Same semaphore, same queue, same inherited wait |
+| Feed unchanged by 533x fewer logical reads | The wait precedes execution — query cost is irrelevant to it |
+| `blocking_session_id = 0` | Correct: a memory queue, not a lock (H5 is dead) |
+| `physical reads = 0` | Nothing waiting on disk |
+| CPU ~28% but never saturated | Not CPU-bound — parked |
+| Trivial `UserNetworks` query at 25s | Small queries need grants too, and queue too |
+| A **DELETE** waiting alongside | Not query-shape specific. Anything needing a grant is stuck |
+
+### Why the grants are large
+
+Memory grants are driven mainly by Sort and Hash operators. Both feeds sort on **unindexed** columns:
+
+```
+home feed   ORDER BY [Created] DESC   (chronological: false)
+storyline   ORDER BY [Date]           (chronological: true)
+```
+
+`Drops` had no index on either. Every page therefore requested a grant large enough to sort the whole
+visible set.
+
+### Fix
+
+`20260918032350_AddDropSortIndexes` — `IX_Drop_Created`, `IX_Drop_Date`. Removes the Sort operator
+and most of the grant. Production script: `docs/migrations/AddDropSortIndexes.sql`.
+
+**This reduces demand on the grant pool; it does not raise the ceiling.** The instance runs SQL Server
+Express, capping `max server memory` at **1410 MB** on a 2 GB `db.t3.small`. Moving off Express is the
+only way to raise it (Round 4).
+
+### Corrections to earlier rounds
+
+- **Round 4 was directionally right** — the instance *is* the problem — but the mechanism is memory,
+  not CPU. Its specific CPU-throttling claim was already withdrawn within that round.
+- **Round 5 was wrong.** The query defect was real and the 533x measurement was real, but it was never
+  the binding constraint.
+- **Round 6's H5 promotion was wrong.** `blocking_session_id = 0` rules out lock blocking. The ~25s
+  constant was the right signal read as the wrong mechanism — a queue, but a memory queue.
+- **The standing dismissal of a `Drops.Date` index was wrong.** It was dismissed on *cost* grounds
+  ("only matters if the query scans a large set"). Under grant pressure the sort matters for an
+  entirely different reason.
+
+### Method note
+
+Four diagnoses were falsified before this one: missing indexes as root cause, CPU throttling, query
+shape as binding constraint, and lock blocking. Each rested on a real measurement of the wrong thing.
+The wait type was decisive and was available from the first round — `sys.dm_exec_requests` and
+`sys.dm_os_wait_stats` should be the *first* diagnostic for any "slow in prod, fast locally" report,
+before any plan or index analysis.
+
+### Next
+
+1. Apply `AddDropSortIndexes.sql` to prod (off-peak — `Drops` is the largest table and the generated
+   script builds both indexes in one transaction).
+2. Re-check the interceptor. Expect the `RESOURCE_SEMAPHORE` waits and the ~25s constant to fall away.
+3. If they persist, the Express 1410 MB ceiling is binding and the engine/instance decision from
+   Round 4 returns.
+
+**Hypothesis updates:**
+- **H11 (new) — query memory grant starvation. CONFIRMED** by wait type.
+- H1 real, fixed, not binding. H5 dead. H10 right in spirit, wrong mechanism.
 
 ---
 
