@@ -1,6 +1,6 @@
 # Investigation: Production GetTimeline SQL Timeout
 
-**Status:** 🟢 **ROOT CAUSE CONFIRMED 2026-09-17 (Round 5)** — the home feed is a CPU-bound query defect, not a hardware shortage. Reopened 2026-09-17; — production telemetry shows the underlying condition was never fixed, only pushed below the 30s timeout. See Round 3, then **Round 4 (infrastructure)**, which corrects a wrong diagnosis made mid-Round-4 and is the current state.
+**Status:** 🔴 **STILL OPEN — Round 5's conclusion was falsified in production (Round 6).** The union rewrite shipped and the feed still times out. Reopened 2026-09-17; — production telemetry shows the underlying condition was never fixed, only pushed below the 30s timeout. See Round 3, then **Round 4 (infrastructure)**, which corrects a wrong diagnosis made mid-Round-4 and is the current state.
 **Date opened:** 2026-09-09
 **Date resolved:** ~~2026-09-09~~ — reopened
 
@@ -667,6 +667,93 @@ home feed at all.
 - **H10 (infrastructure undersizing) → real but NOT the cause.** The instance is genuinely
   mis-specced for SQL Server (Round 4 stands), but fixing it would not fix this query.
 - **H2 / H3 / H4 / H8 → not needed to explain the observed behaviour.**
+
+---
+
+## Round 6 — The rewrite shipped and did NOT fix production (2026-09-17)
+
+**Round 5's conclusion ("a query defect, not a hardware shortage") is falsified.**
+
+### What was deployed
+
+Commit `16cd0ed` (union rewrite) + `8091395` (unrelated admin feature), image `sha256:eb76b2d3`,
+ECS rollout `COMPLETED` 03:12 UTC. New task `684dda02`, old task `544150fc` drained.
+
+### The result
+
+Attribution by log stream, the 10 minutes spanning the swap:
+
+| Task | Feed timeouts | Query shape |
+|---|---|---|
+| `544150fc` (old) | 5 | `SELECT [d0]` — the old three-way OR |
+| `684dda02` (**new**) | **1** | `SELECT [d1]` — **the rewrite** |
+
+The alias shift `[d0]` → `[d1]` is the extra nesting level introduced by `IN (subquery)`. The
+rewritten query ran in production and still hit **`SQL TIMEOUT after 29997ms`**.
+
+The 533x logical-read reduction measured locally is real. **Logical reads were not the binding
+constraint in production.**
+
+### Also note: the incident had escalated before the deploy
+
+The old task logged five `SQL TIMEOUT after 30s` between 03:07 and 03:11 — the feed had gone from
+25s *slow* to actually timing out. The 2026-09-09 outage was recurring while this work was underway.
+
+### The unexplained ~25-second constant
+
+This is now the central fact, and it was under-weighted in Rounds 3-5.
+
+`UserNetworks` — one table, `WHERE UserId = @p`, index `(UserId, Name)` confirmed present by the
+drift audit — is consistently slow:
+
+```
+25021 / 25004 / 25006 / 25017 / 25026 / 25082 ms
+```
+
+Six samples of a trivial single-table lookup, all within 80 ms of each other. No query-cost
+explanation produces that signature; query cost varies with data. **A fixed ~25s wait does.**
+
+The feed lands at the 30s `CommandTimeout` cap whether it performs ~68,800 logical reads (old) or
+129 (new). Two structurally unrelated queries pinned at the same constant, indifferent to their own
+cost, points away from query shape entirely.
+
+**This resembles H5 (blocking), demoted in Round 0 on reasoning rather than evidence.** That
+demotion should not have survived the appearance of the ~25s constant.
+
+### Next test — catch it in the act
+
+While the slow log is firing:
+
+```sql
+SELECT session_id, blocking_session_id, wait_type, wait_time, wait_resource, status, command
+FROM sys.dm_exec_requests WHERE session_id > 50;
+```
+
+| Observation | Conclusion |
+|---|---|
+| non-zero `blocking_session_id`, or `LCK_*` wait | **Blocking.** Identify the writer holding the lock. |
+| `SOS_SCHEDULER_YIELD` dominant | **CPU starvation** — Round 4's db.t3.small sizing becomes the fix after all. |
+| `RESOURCE_SEMAPHORE` | **Memory grant starvation** — the 2 GB / Express 1410 MB ceiling. |
+
+### Do not revert the rewrite
+
+It is not harmful and should stay:
+- Semantically verified — 0 orphans confirmed on production, so the union is provably equivalent
+- 40/40 feed and permission tests green; 419 passed overall
+- Strictly less database work than before
+- The rule now has one definition instead of two duplicated copies
+
+It is simply not sufficient, because the binding constraint is something else.
+
+**Hypothesis updates:**
+- **H1 → real but NOT the binding constraint.** The query defect was genuine and is now fixed; the
+  feed still times out.
+- **H5 (blocking) → un-demoted, now a leading candidate.** The ~25s constant is its signature.
+- **H10 (infrastructure) → back in contention.** If the wait is `SOS_SCHEDULER_YIELD`, Round 4 was
+  right and Round 5 was wrong to rule out hardware.
+- **Lesson:** three confident diagnoses in this investigation have now been falsified (missing
+  indexes as root cause; CPU throttling; query shape as binding constraint). Each was measured but
+  measured the wrong thing. Establish the wait type before the next change.
 
 ---
 
