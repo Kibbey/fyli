@@ -1,5 +1,96 @@
 # Release Notes
 
+## 2026-09-17: Home feed performance — permission query rewrite
+
+### Fix
+
+**Home feed and storyline queries no longer scan every visible memory**
+The permission rule ("which memories can this user see") was one predicate with a three-way `OR`
+across three tables. SQL Server cannot seek an `OR` spanning tables, so it scanned `Drops` and
+re-evaluated all three correlated `EXISTS` subqueries **once per row** before sorting and keeping a
+single page.
+
+Measured on the production home-feed query: **~68,800 logical reads to return 15 rows** (~4,600 per
+row), with `UserDrops` and `NetworkViewers` each scanned 2,128 times — the row count of `Drops`.
+`CPU time` equalled `elapsed time`, so it was pure CPU burn with nothing waiting on I/O.
+
+Expressing the same rule as a `UNION` of three independently seekable sets takes the same query to
+**129 logical reads — 533x fewer.** Production was seeing 25s against a 30s command timeout, four
+seconds from repeating the 2026-09-09 outage.
+
+**Who can see a memory is unchanged.** Same three sources, same semantics; only the shape of the
+question changed.
+
+### How It Works
+
+1. `DropVisibility.VisibleDropIds` returns owned ∪ tagged ∪ granted drop ids, each branch seeking
+   its own index once
+2. `GetAllDrops` in both `DropsService` and `PermissionService` delegates to it — the rule now has
+   one definition instead of two copies
+3. `CanView` is unchanged (still a single `EXISTS` on one drop)
+
+### Backend Changes
+
+- **DropVisibility** (new): single definition of drop visibility
+- **DropsService / PermissionService**: `GetAllDrops` delegates to `DropVisibility.VisibleDrops`
+- **SlowQueryInterceptor** (shipped earlier same day): logs SQL over `SlowQueryThresholdMs`
+  (default 2s) and every failed command — this is what surfaced the problem
+
+### Notes
+
+- No schema change, no migration, no API change, no frontend change
+- 18 characterization tests added in `TimelineFeedPerformanceTest`, green on `main` before the
+  rewrite and unchanged after — `GetTimelineDrops` / `GetAlbumDrops` previously had no coverage
+- Must use `Contains`, not `Join`: `MapDrops` projects nested collections and EF Core can only
+  correlate those when `Drops` is the query root
+- Full detail in `docs/investigations/2026-09-09-gettimeline-sql-timeout.md` (Rounds 3–5)
+
+
+## 2026-09-17: Admin Page, Account Help, Email Change
+
+### New Feature
+
+**Admin page (`/admin`)**
+Users with the additive `admin` role see an Admin item at the bottom of the drawer and can open a role-gated Admin page. Admin can review every ask/bug, see who joined in the last 30 days, search users by email/name/username, and change a user's login email.
+
+**Account Help**
+Every signed-in user can ask a question or file a bug from Account. Submitting emails every current admin and lists the item on Admin. Account-source asks are capped at 5 per user per rolling 24 hours.
+
+**Email change notices**
+Changing a login email updates `UserProfile.Email` and Google `ExternalLogin.Email`, writes an audit row, and emails both addresses. The old-address notice includes a one-tap "I didn't request this" link that files a bug without signing in.
+
+### How It Works
+
+1. Grant `admin` with `docs/migrations/GrantAdminKibbeyj.sql` (no in-product grant UI)
+2. `GET /api/users` now includes `roles: string[]` (empty for existing users)
+3. `POST /api/asks` persists the ask/bug and emails admins
+4. `GET /api/admin/*` requires the admin role (401/403)
+5. `PUT /api/admin/users/{userId}/email` changes login email immediately
+
+### Backend Changes
+
+- **UserRole / Ask / AdminAudit** entities and EF migrations
+- **UserService**: `HasRoleAsync`, `GetRolesAsync`, `GetUser.Roles`
+- **AskService**: create, rate limit, admin notify, email-change dispute
+- **AdminService**: asks list, 30-day signups, user search, email change
+- **AdminAuthorizationAttribute** on `/api/admin/*`
+- Email types 30–32 (AdminAsk, EmailChangeNew, EmailChangeOld)
+
+### Frontend Changes
+
+- `User.roles`, `auth.hasAdmin`, `/admin` route guard
+- Drawer Admin item (last, admin-only)
+- Account Help form
+- AdminView (asks, signups, email change)
+- Public `EmailChangeNoticeView`
+
+### Tests
+
+- UserService role tests, AskService tests, AdminService tests
+- Frontend: auth, drawer, Account Help, AdminView, notice page, API clients
+
+---
+
 ## 2026-02-28: Onboarding Experience
 
 ### New Feature

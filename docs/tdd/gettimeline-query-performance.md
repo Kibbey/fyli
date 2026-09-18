@@ -1,6 +1,6 @@
 # Storyline feed: optional query hardening
 
-**Status:** Optional — do not treat as the timeout fix
+**Status:** ⚠️ **SUPERSEDED IN PART 2026-09-17.** The permission rewrite this doc parks has been measured, built and tested — see *Phase 2 — UN-PARKED* below. Phase 0a/1 (storyline drive-order) remain optional and unstarted.
 **Date:** 2026-09-09 (updated after red-team review)
 **Related:** `docs/investigations/2026-09-09-gettimeline-sql-timeout.md`
 **Prod indexes:** already applied via `docs/migrations/AddMissingGetTimelineIndexes.sql`
@@ -310,9 +310,20 @@ Diff is only `GetTimelineDrops` / `GetAlbumDrops` (plus the new test file).
 
 ## Parked (do not implement in this TDD)
 
-### Global “visible ids” union (`DropVisibility` / new `GetAllDrops`)
+### ~~Global "visible ids" union (`DropVisibility` / new `GetAllDrops`)~~ — ✅ UN-PARKED AND BUILT
 
-Would compute every visible id for every feed. Hurts home feed and album export. If we ever do it, scope it to storyline only: membership ids ∩ (owned ∪ tagged ∪ granted) as `IQueryable`, then `MapDrops`. Never `.ToList()` all visible ids. Never `Concat` (duplicates).
+**This section's reasoning was wrong and is superseded. See "Phase 2 — UN-PARKED" below.**
+
+It was parked on two premises, both since falsified by production telemetry
+(investigation Rounds 3–5):
+
+| Premise | Reality |
+|---|---|
+| "The timeout was storyline-only" | The **home feed** is the slowest endpoint in production (~25s, six samples) |
+| "Would compute every visible id for every feed. Hurts home feed and album export" | It makes the home feed **533x cheaper in logical reads**, not more expensive |
+
+The remaining warnings in the original text were right and were followed: never `.ToList()`
+the ids, never `Concat`.
 
 ### `CanView` as three `Any()` calls
 
@@ -337,6 +348,94 @@ EF6 → EF Core port. `Edit` / `Delete` / `AddComment` (`1847475`) still need In
 ### `GetDropsByIds` card-shape test
 
 That method does **not** use `GetAllDrops`, passes real tag ids, and sorts by `Date` (not input order). It does not lock storyline behavior.
+
+---
+
+## Phase 2 — UN-PARKED: permission rewrite (BUILT 2026-09-17)
+
+### Why it moved out of Parked
+
+`EXPLAIN`-level measurement of the production home-feed query (investigation Round 5):
+
+| | Before | After | Change |
+|---|---|---|---|
+| Logical reads (15 rows) | ~68,800 | **129** | **533x fewer** |
+| `UserDrops` scan count | 2,128 | **1** | per-row evaluation gone |
+| `NetworkViewers` scan count | 2,133 | **1** | per-row evaluation gone |
+| `UserNetworks` reads | 29,844 | **0** | drops out of the plan entirely |
+| CPU time | 26 ms | ~1 ms | floor-limited at local data size |
+
+`CPU time == elapsed time` on the original, so it is pure CPU burn — which also rules out
+any instance upgrade as a fix (see Round 4).
+
+### What was built
+
+**New:** `Domain/Repositories/DropVisibility.cs` — the single definition of the rule.
+
+```csharp
+public static IQueryable<int> VisibleDropIds(StreamContext context, int userId)
+{
+    var owned   = context.Drops.Where(d => d.UserId == userId).Select(d => d.DropId);
+
+    var tagged  = from viewer in context.NetworkViewers
+                  where viewer.UserId == userId
+                  join tagDrop in context.NetworkDrops
+                     on viewer.UserTagId equals tagDrop.UserTagId
+                  select tagDrop.DropId;
+
+    var granted = context.UserDrops.Where(ud => ud.UserId == userId).Select(ud => ud.DropId);
+
+    return owned.Union(tagged).Union(granted);   // Union, never Concat
+}
+
+public static IQueryable<Drop> VisibleDrops(StreamContext context, int userId)
+{
+    var visibleIds = VisibleDropIds(context, userId);
+    return context.Drops.Where(drop => visibleIds.Contains(drop.DropId));
+}
+```
+
+`GetAllDrops` in **both** `DropsService` and `PermissionService` now delegates to it — the rule
+exists in one place instead of two copies. `CanView` is untouched.
+
+### ⚠️ `Contains`, not `Join` — this doc predicted the failure
+
+The first attempt used `.Join(...)`. All feed tests failed with:
+
+```
+InvalidOperationException: Unable to translate a collection subquery in a projection
+since either parent or the subquery doesn't project necessary information required to
+uniquely identify it...
+```
+
+`MapDrops` projects nested collections (Images, Movies, Comments with their own media). EF Core
+can only correlate those when `Drops` is the **root** entity; a `Join` makes it a join output.
+
+This doc's parked text already said exactly this — *"combine **ints**, then `Where(id in …)`,
+then `MapDrops`"* — and it was right. Switching to `Contains` fixed all 25 failures, and
+measured slightly **better** than `Join` (129 vs 139 reads).
+
+### Test results
+
+- **Phase 0b characterization tests written first**: 18 new tests in
+  `DomainTest/Repositories/TimelineFeedPerformanceTest.cs`, **green on unmodified `main`** before
+  any production code changed.
+- After the rewrite: **40/40** on `TimelineFeedPerformanceTest` + `FeedVisibilityTest` +
+  `PermissionServiceTest`.
+- Full suite: **416 passed, 3 failed** — the 3 are `AdminServiceTest` / `AskServiceTest`, part of
+  an unrelated in-progress admin feature, and are test-isolation failures (leftover
+  `ExternalLogins` and admin rows in the shared local database). Neither service references
+  `GetAllDrops`, `DropsService`, or `DropVisibility`.
+
+### Known limits
+
+- **Equivalence is sampled, not exhaustive.** A 30-user comparison (15 most-active + 15 random)
+  of the full visible set showed 0 lost / 0 leaked / 0 duplicates. An all-users comparison was
+  attempted and **killed the local SQL Server session** — because the *original* query is
+  O(users × drops). Running it against a production restore was explicitly skipped.
+- **The sort is unchanged.** `ORDER BY Created DESC` with `OFFSET/FETCH` still sorts the whole
+  visible set per page, and `Drops.Created` has no index. That is the next ceiling, and it is the
+  keyset-pagination item still listed as out of scope.
 
 ---
 

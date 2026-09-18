@@ -1,8 +1,8 @@
 # Investigation: Production GetTimeline SQL Timeout
 
-**Status:** ✅ Resolved (incident). Remaining query-shape work not done.
+**Status:** 🟢 **ROOT CAUSE CONFIRMED 2026-09-17 (Round 5)** — the home feed is a CPU-bound query defect, not a hardware shortage. Reopened 2026-09-17; — production telemetry shows the underlying condition was never fixed, only pushed below the 30s timeout. See Round 3, then **Round 4 (infrastructure)**, which corrects a wrong diagnosis made mid-Round-4 and is the current state.
 **Date opened:** 2026-09-09
-**Date resolved:** 2026-09-09
+**Date resolved:** ~~2026-09-09~~ — reopened
 
 ## Problem Statement
 
@@ -335,7 +335,346 @@ Do **not** treat `Drops.Date` as the first fix. A new EF migration locally would
 
 ---
 
+## Round 3 — Production telemetry after SlowQueryInterceptor deploy (2026-09-17)
+
+**Reopens this investigation.** The 09-09 resolution ("indexes fixed it") is incomplete.
+
+### How this was found
+
+`SlowQueryInterceptor` (commit `be13506`) deployed to prod 2026-09-17 20:10 CDT. It logs any
+command over `SlowQueryThresholdMs` (default 2000ms). Within the first 30 minutes it captured
+**eight commands between 15.1s and 25.6s against a 30s `CommandTimeout`.**
+
+Captured SQL is saved under `docs/investigations/sql-captures/` (no parameter values are
+logged, so the files carry no PII).
+
+### The eight slow commands
+
+| Duration | Query | Capture |
+|----------|-------|---------|
+| 25604 / 25260 / 25252 / 25171 ms | **Home feed** `GetDrops` → `MapDrops` | `2026-09-17-getdrops-homefeed-25s.sql` |
+| 25146 ms | `QuestionSets` | `2026-09-17-questionsets-25s.sql` |
+| 18922 / 15158 ms | `Timelines` + `TimelineUsers` | `2026-09-17-timelines-19s.sql` |
+| 16337 ms | `Questions` ordered by `AnsweredAt DESC` | `2026-09-17-questions-16s.sql` |
+
+All eight fall in a 2.5-minute window, 01:16:38–01:19:08 UTC.
+
+### Finding 1 — the home feed is the slowest endpoint in production
+
+Four identical 25s commands. The outer shape is exactly H1, on `GetDrops` rather than
+`GetTimelineDrops`:
+
+```sql
+FROM [Drops] AS [d]
+WHERE EXISTS (SELECT 1 FROM [NetworkDrops] [n] JOIN [UserNetworks] [u] ...
+              AND EXISTS (SELECT 1 FROM [NetworkViewers] [n0] WHERE ... [n0].[UserId] = @__userId_0))
+   OR [d].[UserId] = @__userId_0
+   OR EXISTS (SELECT 1 FROM [UserDrops] [u0] WHERE [d].[DropId] = [u0].[DropId] AND [u0].[UserId] = @__userId_0)
+ORDER BY [d].[Created] DESC
+OFFSET @__p_1 ROWS FETCH NEXT @__p_2 ROWS ONLY
+```
+
+Root is `Drops`, the full three-way permission OR is evaluated, then `OFFSET/FETCH`. No
+`TimelineDrops` anywhere — this is the home feed at `take: 15`.
+
+Note the sort column: **`Created`, not `Date`.** `MapDrops` uses `OrderByDescending(o => o.Created)`
+when `chronological: false`. `Drops` has no index on `Created` either, so H3's missing-sort-index
+argument applies to the home feed as well — and neither `Date` nor `Created` was in the
+09-09 index catch-up.
+
+### Finding 2 — this is not one bad query
+
+Three unrelated query families are also 15–25s. The `Timelines` one is only 686 characters:
+
+```sql
+FROM [Timelines] [t] LEFT JOIN [TimelineUsers] [t1] ON ...
+WHERE [t].[UserId] IN (SELECT [c].[value] FROM OPENJSON(@__connectedUserIds_0) ...)
+   OR EXISTS (SELECT 1 FROM [TimelineUsers] [t0] WHERE ... [t0].[UserId] IN (SELECT ... OPENJSON(@__connectedUserIds_0) ...))
+ORDER BY [t].[TimelineId]
+```
+
+A small two-table query taking 18.9s is not a query-shape problem. Two things stand out:
+
+- **`OPENJSON` twice, combined with `OR`.** `OPENJSON` without a schema carries a fixed 50-row
+  cardinality estimate (the H4 mechanism), and here it feeds both sides of an `OR` — a reliable
+  bad-plan generator.
+- **`Timelines.UserId` / `TimelineUsers` indexes were never part of the 09-09 catch-up.**
+  `AddMissingGetTimelineIndexes.sql` covered only seven indexes on the `GetTimeline` path:
+  `UserDrops`, `NetworkDrops`, `Drops.UserId`, `ImageDrops`, `MovieDrops`, `Comments`,
+  `NetworkViewers`. If the 2021 Initial migration's indexes never landed *generally*, then
+  `Timelines`, `TimelineUsers`, `Questions`, `QuestionSets`, and `QuestionResponses` are all
+  still missing theirs — which would explain all four query families at once.
+
+### Finding 3 — what the 09-09 fix actually did
+
+It took `GetTimelineDrops` below 30s. It did not address the condition. The same `GetAllDrops`
+shape is running 25s on the home feed today, **4 seconds from throwing the same
+`SqlException -2`** — on the app's most-trafficked endpoint.
+
+The 09-09 incident is better read as: `GetAllDrops` is too slow everywhere, and the storyline
+path happened to cross 30s first.
+
+### What this invalidates
+
+- **Resolution as written** ("recovered after indexes + reboot") describes the symptom, not the cause.
+- **`docs/tdd/gettimeline-query-performance.md`** states "The timeout was storyline-only" and
+  "`GetDrops` (home feed) … Leave it alone," and parks the `DropVisibility` permission rewrite
+  partly on the premise that touching the shared rule risks the home feed for no gain. The home
+  feed is the slowest thing in production. **Phase 2 — the parked one — is the change that
+  addresses this. Phase 1, the only one still live, would do nothing for the home feed.**
+- **H5 / H7** (contention, resource saturation) were demoted on 09-09 reasoning. Four unrelated
+  query families slow in the same 2.5-minute window is consistent with them again.
+
+### Two competing readings — not yet distinguished
+
+| | Reading A — broad schema drift | Reading B — post-deploy cold start / contention |
+|---|---|---|
+| Claim | The Initial migration's indexes never landed generally; many tables still lack them | All eight cluster 5–8 min after an ECS task swap: cold plan cache, cold buffer pool, clients reconnecting at once |
+| Supports | Four unrelated families slow; the 09-09 audit only fixed 7 indexes on one path | Tight 2.5-min window, nothing logged since |
+| Against | Does not explain the tight clustering | 25s for a 686-char two-table query is extreme for cold cache alone |
+
+**These are not exclusive** — drift would make a cold-start burst far worse. Do not act as if
+one is settled.
+
+### Next tests
+
+1. **Full index drift audit**, not just the `GetTimeline` path — diff every `HasIndex` in
+   `StreamContextModelSnapshot.cs` against prod `sys.indexes`. This is the single highest-value
+   step and directly tests Reading A.
+2. **Leave the interceptor running and re-check in 24h.** If slow commands appear steadily
+   outside deploy windows, Reading B is dead. If they only ever cluster after a deploy, Reading A
+   is at most a contributing factor.
+3. **Lower `SlowQueryThresholdMs` to ~500** for a day to get the real latency distribution of
+   the home feed rather than only its worst outliers.
+4. **Capture the actual plan** for `2026-09-17-getdrops-homefeed-25s.sql` — this answers the
+   TDD's Phase 0a question for the feed instead of the storyline.
+
+**Hypothesis updates:**
+- **H1 → confirmed in production, on the home feed.** No longer storyline-specific.
+- **H9 (missing indexes) → still confirmed, but scoped too narrowly.** The 09-09 catch-up fixed
+  one code path, not the schema.
+- **H4 (`OPENJSON` cardinality) → raised.** Now observed in a real 18.9s query with `OPENJSON` on
+  both sides of an `OR`.
+- **H3 → applies to `Created` as well as `Date`.** Neither is indexed.
+- **H5 / H7 → un-demoted**, pending test 2.
+
+---
+
+## Round 4 — Infrastructure: the database instance (2026-09-17)
+
+Triggered by the question "the app gets almost no use — why are we low on CPU credit?"
+
+### Finding 1 — there is essentially no database traffic
+
+| Metric | 7-day value | Reading |
+|---|---|---|
+| `DatabaseConnections` | **avg 0.01–0.31**, max 7 | Idle almost always |
+| `CPUUtilization` | avg 24.7% → 32.1%, **min never below ~17–25%** | No idle period in 7 days, trending up |
+| `ReadIOPS` | flat ~25/sec, 24/7, near-zero variance | Constant, traffic-independent |
+| `WriteIOPS` | ~1/sec | Nothing being written |
+| `BurstBalance` | 99% | Storage not a bottleneck |
+| `ReadLatency` | 0.66 ms | Disk healthy |
+
+A database averaging 0.03 connections while burning 28% CPU and 25 IOPS is not running application
+queries. Over seven days — including weekend nights — CPU **never** drops to idle.
+
+### Finding 2 — the instance
+
+`fyli` is **`db.t3.small`** (2 vCPU / 2 GB), engine **`sqlserver-ex` (SQL Server Express)**, 20 GB gp2,
+Single-AZ. Express caps the buffer pool at **1410 MB** and the database at **10 GB** regardless of
+instance size, so a larger instance buys memory the engine will not use.
+
+`FreeableMemory` ~178 MB on a 2 GB box: Express likely cannot even reach its own 1410 MB cap.
+
+### Finding 3 — ⚠️ CORRECTION: the instance is NOT CPU-throttled
+
+**An earlier conclusion in this round was wrong and is corrected here.** On seeing
+`CPUCreditBalance: 0.0` sustained for 24h, it was concluded that CPU was hard-throttled to the 20%
+baseline, and the recommended fix was "enable T3 Unlimited." Both were wrong:
+
+- **RDS `db.t3` instances run in Unlimited mode by default and it is not configurable.** There is no
+  `--credit-specification` parameter on `rds modify-db-instance` (verified, AWS CLI 2.27.49). That is
+  an EC2 feature.
+- **T3 (unlike T2) bursts above baseline even at zero credit balance.** `CPUUtilization` reaching
+  41–45% against a 20% baseline was visible in the same data that prompted the throttling claim and
+  contradicted it. The surplus metrics were not checked before concluding.
+
+What the metrics actually show:
+
+| Metric | Value | Meaning |
+|---|---|---|
+| `CPUCreditBalance` | 0.0 for 24h+ | No earned credits — expected, since it never idles |
+| `CPUSurplusCreditBalance` | **576.00, pinned** | Borrowed credits at the **maximum** for t3.small (24/hr × 24h) |
+| `CPUSurplusCreditsCharged` | **0.76–2.23 per hour, continuous** | Already being billed for surplus |
+
+Surplus is repaid only during genuine idle. This instance never idles, so it borrowed to the ceiling
+and parked there. **At the surplus ceiling AWS does begin throttling to baseline** — so the position
+is: paying surplus charges every hour *and* unable to borrow further. Roughly $4–5/month for an
+instance that still cannot go faster on demand.
+
+### Finding 4 — this is a known, documented SQL Server + RDS burstable problem
+
+Not specific to this application. Widely reported:
+
+- *"Amazon RDS Instance Using 25~35% CPU While Completely Idle (Zero Sessions, Zero Queries)"* — AWS re:Post
+- *"High CPU Usage on an Idle MSSQL RDS database"* — AWS re:Post
+- A `t3.micro` running SQL Server Express is reported to sit at a **minimum of 25% CPU when not in
+  use**; older t2 instances used far less.
+
+Cited causes: SQL Server background processes and memory management; burstable instances *barely
+meeting SQL Server's minimum hardware requirements*; and insufficient memory forcing disk I/O that
+itself drives CPU. The consensus is that there is **no configuration fix** — SQL Server's resting
+footprint exceeds what a small burstable class provides.
+
+Our numbers (min ~20–25%, flat ~25 IOPS, zero connections) match that profile exactly.
+
+### Finding 5 — no monitoring overhead to reclaim
+
+Checked in response to "can we shut down monitoring to lower load":
+
+| Setting | State |
+|---|---|
+| Enhanced Monitoring | Off (interval 0) |
+| Performance Insights | Off |
+| CloudWatch log exports | None |
+| Backup retention | 7 days (keep) |
+
+All already disabled. The resting load is SQL Server plus the mandatory RDS agent, neither optional.
+Enabling Performance Insights would *add* load — though it is the tool that would identify which
+internal task spends the CPU.
+
+### What remains unexplained
+
+**The home feed's ~25s is not yet accounted for.** The throttling explanation is withdrawn. Remaining
+candidates, none confirmed:
+
+1. **Query shape (Round 2 / H1)** — starts from every drop the user can see, sorts all of them, keeps 15.
+2. **CPU starvation at the surplus ceiling** — weaker than the withdrawn throttling claim, but not zero.
+3. **Memory** — Express on 2 GB with ~178 MB free cannot cache the working set, forcing physical reads.
+
+Note the home feed timings are remarkably consistent: 25260 / 25604 / 25171 / 25252 / 25292 / 25329 ms
+across 23 minutes. That consistency favours a **deterministic query cost** over variable contention —
+which points back at candidate 1. By contrast the `UserNetworks` single-table query varied widely
+(5811 / 10349 / 14720 ms), which does look like contention.
+
+### Next tests
+
+1. **Capture the execution plan** for `sql-captures/2026-09-17-getdrops-homefeed-25s.sql`. Free, and
+   it separates candidate 1 from 2 and 3. **Do this before buying hardware.**
+2. **Check database size against the Express 10 GB limit.** That is a wall, not a slowdown.
+3. **Apply `IX_TimelineUsers_TimelineId`** (see `AddMissingIndexes-2026-09-17.sql`) — the only missing
+   index tied to a measured slow query (18.9s `Timelines` query).
+4. **Do not resize to `db.t3.medium`** — same 20% baseline, no improvement. Only a non-burstable class
+   (`db.m5.large`+, ~$250–280/mo vs ~$38 today) removes the credit system. That is a large jump for a
+   near-zero-traffic app and deserves a decision about whether SQL Server on RDS is the right home.
+
+**Hypothesis updates:**
+- **New H10 — infrastructure undersizing.** SQL Server Express's resting footprint (~25%) exceeds the
+  `db.t3.small` 20% baseline, so the instance is permanently in surplus. Confirmed as a *condition*;
+  not yet confirmed as the cause of the 25s feed.
+- **H1 → still the leading explanation for the home feed**, supported by the consistency of its timings.
+- **H5 / H7 (contention)** → partially supported, but by `UserNetworks`, not the feed.
+- **H8 (plan flip)** → unchanged.
+
+---
+
+## Round 5 — Execution plan captured: H1 confirmed with numbers (2026-09-17)
+
+**This closes the question Round 4 left open.** The home feed's ~25s is a **query defect**, not
+infrastructure.
+
+Captured with `sql-captures/capture-homefeed-plan.sql` against a local database carrying ~2,128 drops.
+Local reproduces the plan *shape*; production differs only in cardinality and CPU speed.
+
+### The plan, for 15 returned rows
+
+| Table | Scan count | Logical reads |
+|---|---|---|
+| `Drops` | **1** (full pass) | 50 |
+| `UserDrops` | **2,128** | 4,802 |
+| `NetworkViewers` | **2,133** | 4,266 |
+| `NetworkDrops` | — | **29,844** |
+| `UserNetworks` | — | **29,844** |
+| **Total** | | **~68,800** |
+
+**~4,600 logical reads per row returned.**
+
+Scan counts of 2,128 / 2,133 equal the row count of `Drops`. The three permission `EXISTS` subqueries
+are re-evaluated **once per row of the entire table**, then everything is sorted, then `OFFSET/FETCH`
+discards all but 15. This is exactly H1, now measured rather than argued.
+
+### It is CPU-bound — which settles the hardware question
+
+```
+CPU time = 26 ms,  elapsed time = 26 ms.
+```
+
+CPU time **equals** elapsed time: zero waiting, on disk, locks, or memory. `physical reads = 0` on
+every table — everything was already cached.
+
+Therefore:
+- **`db.t3.medium` cannot help.** Identical 20% CPU baseline, and CPU is 100% of the cost.
+- **More RAM cannot help.** Nothing is waiting on I/O; the whole ~1 GB database already fits in cache.
+- **The ~$250–280/mo non-burstable upgrade is not indicated.** It would mask a query doing 4,600
+  reads per returned row.
+
+Local runs in 26 ms because it has ~2,100 drops on an unthrottled CPU. Production has more rows and
+roughly 0.4 effective vCPU — same shape, ~1000x the wall time.
+
+### The rewrite, measured on the same data
+
+Replacing the three-way correlated `OR` with a `UNION` of three seekable sets, then joining:
+
+```sql
+FROM [Drops] AS [d]
+INNER JOIN (
+    SELECT [DropId] FROM [Drops] WHERE [UserId] = @userId
+    UNION
+    SELECT [n].[DropId] FROM [NetworkDrops] AS [n]
+      INNER JOIN [NetworkViewers] AS [nv] ON [n].[UserTagId] = [nv].[UserTagId]
+      WHERE [nv].[UserId] = @userId
+    UNION
+    SELECT [DropId] FROM [UserDrops] WHERE [UserId] = @userId
+) AS [v] ON [v].[DropId] = [d].[DropId]
+ORDER BY [d].[Created] DESC OFFSET 0 ROWS FETCH NEXT 15 ROWS ONLY
+```
+
+| | Current | Rewrite | Change |
+|---|---|---|---|
+| Logical reads | ~68,800 | **139** | **495x fewer** |
+| `UserDrops` scan count | 2,128 | **1** | per-row evaluation gone |
+| `NetworkViewers` scan count | 2,133 | **1** | per-row evaluation gone |
+| `UserNetworks` reads | 29,844 | **0** | table drops out entirely |
+| CPU time | 26 ms | **~1 ms** | floor-limited at this size |
+
+`UserNetworks` disappears because joining `NetworkViewers` directly is sufficient — the hop through
+`UserNetworks` in the current query adds nothing but work.
+
+### What this means for the TDD
+
+`docs/tdd/gettimeline-query-performance.md` **parks** this rewrite (as "Global visible ids union")
+on the reasoning that computing visible ids for every feed could hurt the home feed, and that the
+timeout was storyline-only. Both premises are now false:
+
+- The home feed is the slowest endpoint in production.
+- The union rewrite makes it **495x cheaper in reads**, not more expensive.
+
+**Phase 2 should be un-parked and is the fix.** Phase 1 (storyline drive-order) does not touch the
+home feed at all.
+
+**Hypothesis updates:**
+- **H1 → CONFIRMED with measurements.** Root cause of the home feed's 25s.
+- **H10 (infrastructure undersizing) → real but NOT the cause.** The instance is genuinely
+  mis-specced for SQL Server (Round 4 stands), but fixing it would not fix this query.
+- **H2 / H3 / H4 / H8 → not needed to explain the observed behaviour.**
+
+---
+
 ## Resolution
+
+> ⚠️ **Superseded by Round 3 (2026-09-17).** This section describes how the *incident* was
+> stopped, not the root cause. Production telemetry shows the home feed running 25s against a
+> 30s timeout. Read Round 3 before acting on anything below.
 
 **Root Cause:** Prod was missing secondary indexes that the 2021 EF Initial migration declared (H9). Combined with a likely stale plan (reboot cleared the plan cache — H8). `GetTimelineDrops` recovered after indexes + SQL Server reboot.
 
