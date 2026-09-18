@@ -2,7 +2,7 @@
 
 ## Overview
 
-- **Database:** SQL Server (via Docker, `localhost:1433`)
+- **Database:** SQL Server (via Docker, `localhost:1433`) — see [Local SQL Server (Docker)](#local-sql-server-docker) for how to start it
 - **ORM:** EF Core 9.0.8 (Code-First)
 - **Target Framework:** .NET 9.0
 - **Context:** `StreamContext` in `cimplur-core/Memento/Domain/Entities/StreamContext.cs`
@@ -55,10 +55,70 @@ Never write raw SQL for schema changes. Always use the Code-First workflow:
 
 Migrations are auto-generated in `cimplur-core/Memento/Domain/Migrations/`.
 
+## Local SQL Server (Docker)
+
+The local database runs in Docker on `localhost:1433`. **It is not started automatically.**
+If it is not running, every integration test in `DomainTest` fails at
+`SqlConnection.TryOpen` — roughly 298 of 375 — with a connection error rather than an
+assertion failure. That symptom means "the container is stopped," not "the code is broken."
+
+### Start it
+
+Most checkouts already have a hand-created container named `sql_server_instance`:
+
+```bash
+docker start sql_server_instance
+
+# Wait until it accepts connections (first start after a long gap takes ~30s
+# while it recovers databases):
+until docker exec sql_server_instance /opt/mssql-tools18/bin/sqlcmd \
+    -S localhost -U SA -P 'Dog1$Dobbie!' -C -Q "SELECT 1" >/dev/null 2>&1; do sleep 3; done
+```
+
+Check state with `docker ps -a | grep mssql`. An exit code of `137` is a SIGKILL from a
+`docker stop` that exceeded its timeout or from Docker Desktop shutting down — SQL Server
+takes longer than the default 10s to stop. It is not a crash and not data loss.
+
+### Two things to know about that container
+
+**It has no volume.** `docker inspect sql_server_instance --format '{{.Mounts}}'` returns
+`[]`. The databases live in the container's writable layer, so `docker rm
+sql_server_instance` — or a `docker system prune -a` — **permanently destroys the local
+schema**. Several stale `mcr.microsoft.com/mssql/server` containers tend to accumulate
+alongside it, which makes an incautious cleanup sweep a real risk.
+
+**The application tables live in `master`.** There is no separate `fyli` database; the ~49
+tables sit in the `master` system database, which is why the connection string ends in
+`Database=Master`. This is why the container cannot simply be backed up and restored onto a
+fresh instance: `master` is a system database, and restoring it requires single-user mode
+and a matching SQL Server build. Moving to a volume-backed instance means recreating the
+schema, not copying it.
+
+### Fresh machine, or migrating off the volumeless container
+
+`docker-compose.yml` in the repo root defines a `fyli-sql` service with a named volume
+(`fyli_sql_data`), so its databases survive container removal.
+
+```bash
+docker stop sql_server_instance   # port 1433 can only be bound once
+docker compose up -d
+```
+
+It starts **empty**. Apply the schema before running tests:
+
+```bash
+cd cimplur-core/Memento
+dotnet ef database update --project Domain --startup-project Memento
+```
+
+The image is amd64-only, so it runs under emulation on Apple Silicon; the compose file sets
+`platform: linux/amd64` and allows a 90s `start_period` for first boot.
+
 ## Connection Configuration
 
 - **Design-time** (migrations): reads `DatabaseConnection` from `cimplur-core/Memento/Domain/appsettings.json` via `DesignTimeDbContextFactory`
 - **Runtime** (services): reads `DatabaseConnection` from environment variable (loaded from `.env`)
+- **Tests**: `DatabaseConnection` env var if set, otherwise the localhost fallback hardcoded in `DomainTest/Repositories/BaseRepositoryTest.cs`
 
 ## Service Data Access Pattern
 

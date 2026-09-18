@@ -1,0 +1,54 @@
+# Local SQL Server for cimplur-core development and DomainTest.
+#
+# READ THIS BEFORE RUNNING IT
+# ---------------------------
+# This compose file creates a NEW, EMPTY SQL Server instance with a named volume.
+# It is NOT the instance most existing checkouts are using.
+#
+# The long-lived local instance is a hand-created container named
+# `sql_server_instance`. It has NO volume, and the ~49 application tables live
+# in its `master` system database. `docker rm sql_server_instance` destroys that
+# schema permanently and this compose file will NOT bring it back.
+#
+# If `sql_server_instance` exists on your machine:
+#     docker start sql_server_instance      # this is all you need
+#
+# Use this compose file only for a fresh machine, or to migrate off the
+# volumeless container. Either way the schema must be applied afterwards —
+# see docs/DATABASE_GUIDE.md, "Local SQL Server (Docker)".
+#
+# Port 1433 can only be bound once. Stop the other instance first:
+#     docker stop sql_server_instance
+
+services:
+  sql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: fyli-sql
+    # The image is amd64-only; Apple Silicon runs it under emulation.
+    platform: linux/amd64
+    environment:
+      ACCEPT_EULA: "Y"
+      # Matches the DomainTest fallback connection string in
+      # DomainTest/Repositories/BaseRepositoryTest.cs.
+      SA_PASSWORD: "Dog1$$Dobbie!"
+      MSSQL_PID: developer
+    ports:
+      - "1433:1433"
+    volumes:
+      # Named volume, so the databases survive `docker rm fyli-sql`.
+      # This is the one thing `sql_server_instance` does not have.
+      - fyli_sql_data:/var/opt/mssql
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "$$SA_PASSWORD" -C -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      # First boot creates the system databases and can take a while under
+      # emulation; do not let the healthcheck fail the container during it.
+      start_period: 90s
+
+volumes:
+  fyli_sql_data:
