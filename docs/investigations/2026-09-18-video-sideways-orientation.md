@@ -23,12 +23,12 @@ After switching video upload from server-side ingest + Elastic Transcoder to dir
 
 | ID | Hypothesis | Likelihood | Status |
 |----|-----------|-----------|--------|
-| H1 | MediaConvert job never sets `VideoSelector.Rotate = AUTO`, so phone rotation tags are ignored and then stripped | 9/10 | ✅ Confirmed (code) |
-| H2 | “Sometimes” = portrait phone clips only (landscape has no rotate tag; some Androids bake rotation into pixels) | 8/10 | 🔍 Untested |
-| H3 | Blob preview looks correct because the browser honors the original rotate tag; the transcoded file does not | 7/10 | 🔍 Untested |
-| H4 | Abandoned `Fyli_Default` job template had AUTO rotate; inline rewrite omitted it | 5/10 | 🔍 Untested |
-| H5 | Even AUTO would miss some files (not `.mov`/`.mp4`, or rotation metadata not ~90/180/270) | 4/10 | 🔍 Untested |
-| H6 | Frame-capture thumbnail/poster is unrotated, so the player *looks* sideways even if video pixels are fine | 3/10 | 🔍 Untested |
+| H1 | MediaConvert job never sets `VideoSelector.Rotate = AUTO`, so phone rotation tags are ignored and then stripped | 9/10 | ✅ Confirmed |
+| H2 | “Sometimes” = portrait phone clips only (landscape has no rotate tag; some Androids bake rotation into pixels) | 8/10 | — Superseded by H1 |
+| H3 | Blob preview looks correct because the browser honors the original rotate tag; the transcoded file does not | 7/10 | — Superseded by H1 |
+| H4 | Abandoned `Fyli_Default` job template had AUTO rotate; inline rewrite omitted it | 5/10 | — Superseded by H1 |
+| H5 | Even AUTO would miss some files (not `.mov`/`.mp4`, or rotation metadata not ~90/180/270) | 4/10 | — Superseded by H1 |
+| H6 | Frame-capture thumbnail/poster is unrotated, so the player *looks* sideways even if video pixels are fine | 3/10 | — Superseded by H1 |
 
 ### H1 — MediaConvert `Rotate` not set (most likely)
 
@@ -103,10 +103,16 @@ User asked for the H1 fix rather than a live-file probe. Confirmed in `MovieServ
 
 **Conclusion:** ✅ Confirmed as the code-level cause. Live portrait-upload verification is post-deploy.
 
+### Round 2 — Live verification
+
+User confirmed after the 2026-09-19 backend deploy that a new upload plays upright. H1 is confirmed in production.
+
 ---
 
 ## Resolution
 
 **Root Cause:** MediaConvert job did not set `VideoSelector.Rotate = AUTO`. Phone portrait clips (landscape pixels + 90°/270° rotate tag) were transcoded without baking or preserving orientation, so they played sideways.
 
-**Recommended Action:** Deployed. Upload a portrait phone video after the API rolls out and confirm playback and poster are upright. Existing sideways clips are unchanged until re-transcoded.
+**Fix:** `MovieService.CreateMediaConvertInput` sets `VideoSelector.Rotate = InputRotate.AUTO`. Deployed to ECS `apis-service-fyli-8080` on 2026-09-19. Live portrait upload confirmed upright.
+
+**Follow-up:** Existing sideways clips are unchanged until they are transcoded again.
