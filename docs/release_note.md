@@ -1,5 +1,22 @@
 # Release Notes
 
+## 2026-09-19: Portrait videos no longer play sideways
+
+### Fix
+
+**New video uploads keep the orientation the phone recorded**
+Phone cameras (especially iPhone held upright) store a landscape pixel buffer plus a rotation tag. After the switch to S3 direct upload + MediaConvert, that tag was ignored and then stripped, so portrait clips played on their side.
+
+MediaConvert jobs now set `VideoSelector.Rotate = AUTO`, which bakes the tag into the pixels. Landscape clips and cameras that already bake orientation are unchanged.
+
+Already-uploaded sideways videos stay as they are until they are transcoded again. This only affects new uploads after this deploy.
+
+### Backend Changes
+
+- **MovieService**: MediaConvert input sets `Rotate = AUTO` (applies to both the MP4 and the thumbnail)
+
+---
+
 ## 2026-09-17: Home feed performance — permission query rewrite
 
 ### Fix
