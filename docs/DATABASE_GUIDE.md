@@ -199,6 +199,7 @@ The `StreamContext` defines 40+ DbSets. The core domain model is user-centric:
 - **UserRole** — additive roles (`admin`); users with no rows are normal users
 - **Ask** — in-product ask/bug submissions from Account
 - **AdminAudit** — admin email-change history and dispute tokens
+- **AppVisit** — authenticated app session log (30-minute debounce)
 - **PremiumPlan / SharedPlan / Transaction** — subscriptions and billing
 
 ## Migration History
@@ -216,3 +217,4 @@ The `StreamContext` defines 40+ DbSets. The core domain model is user-centric:
 | 20260918015900 | AddAsk |
 | 20260918020101 | AddAdminAudit |
 | 20260918032350 | AddDropSortIndexes (Drops.Created, Drops.Date — RESOURCE_SEMAPHORE fix) |
+| 20260919172928 | AddAppVisit |

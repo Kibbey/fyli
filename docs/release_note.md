@@ -1,5 +1,34 @@
 # Release Notes
 
+## 2026-09-19: Admin Usage metrics
+
+### New Feature
+
+**Usage section on Admin**
+The owner can open `/admin` and see visits, comments, and memory creations for today, the last 7 days, and the last 30 days, plus a last-7-days unique-visitor strip. Tapping a metric (or a DAU day) lists who, when, and — for comments and creations — the memory id with an 80-character snippet.
+
+Visit logging is silent: signed-in family use of the app records an authenticated session (30-minute server debounce). A failed visit write never surfaces in the family UI. Regular users never see Usage.
+
+### How It Works
+
+1. `POST /api/visits` records a path on authenticated app routes (`meta.auth`), including onboarding
+2. `GET /api/admin/usage` and `GET /api/admin/usage/events` are admin-only; comments are `Kind = Normal`; creations use `Drop.Created` (including archived)
+3. The Usage card sits on the existing Admin page between Asks & bugs and Joined last 30 days
+
+### Backend Changes
+
+- **AppVisits** table (additive)
+- **VisitService** / **VisitController**
+- **AdminService.GetUsageAsync** / **GetUsageEventsAsync**
+
+### Notes
+
+- No family-facing change besides a fire-and-forget visit POST
+- Drops, comments, sharing, and drop access are untouched
+- `fyli-fe` and `fyli-html` are unchanged
+
+---
+
 ## 2026-09-19: Portrait videos no longer play sideways
 
 ### Fix
