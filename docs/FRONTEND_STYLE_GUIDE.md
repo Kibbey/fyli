@@ -24,6 +24,7 @@ This is the core brand color (logo, primary buttons, links, active states).
 | `--fyli-primary-hover` | `#45a67e` | Hover/active states on primary |
 | `--fyli-primary-light` | `#e8f7f0` | Tinted backgrounds, highlights |
 | `--fyli-primary-dark` | `#3b8a69` | High-emphasis text on light bg |
+| `--fyli-primary-darker` | `#2f6e54` | Avatar initials on `--fyli-primary-light` (5.46:1) |
 
 Applied via CSS custom property overrides in `main.css` (not Sass).
 

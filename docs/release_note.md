@@ -1,5 +1,51 @@
 # Release Notes
 
+## 2026-09-20: User avatars
+
+### New Feature
+
+**One photo, everywhere a name appears**
+Every user can set an optional square photo on their account page. It shows up beside their name on memory cards, comments, the connections list, the sharing-recipient picker, shared-memory pages, and in the header. Anyone without one keeps the initials circle they have today — same layout, same payload shape plus a null `avatarUrl`.
+
+New users who sign in with Google get a one-time "Is this you?" step after First Moment. Nothing is fetched from Google until they say yes; skipping is a real peer of the other options, and the step is never shown twice.
+
+### How It Works
+
+1. Photos are stored as a single 256 × 256 JPEG at `avatars/{AvatarToken}.jpg` in the existing S3 bucket. `AvatarToken` is an unguessable GUID on `UserProfile`, regenerated on every upload — so avatar URLs are immutable and served with `max-age=31536000, immutable`
+2. `GET /api/avatars/{token}/photo.jpg` is anonymous (share-link visitors must see faces) and rate-limited at 300/min per IP. There is no `/api/avatars/{userId}`, so the endpoint is not an enumeration surface
+3. Avatars are the only images Fyli serves to unauthenticated viewers, so they are the only ones stripped of EXIF/GPS. **Drop images keep their metadata exactly as before** — the two paths share orientation logic through a new pure `ImageProcessing` utility, not a shared mutable service
+4. The Google photo is fetched server-side on accept only, through an https + `googleusercontent.com` host allowlist with no redirects, a 5 s timeout, and a 10 MB streaming cap
+
+### Backend Changes
+
+- **`UserProfiles`** + `AvatarToken`, `AvatarUpdatedAt`, `PendingAvatarSourceUrl` (all nullable) and the filtered unique index `IX_UserProfiles_AvatarToken` — migration `AddUserAvatar`
+- **`ImageProcessing`** (new pure utility); `ImageService.RotateImage` now delegates to it, behaviour unchanged
+- **`AvatarService`** / **`AvatarController`** / **`IAvatarStorage`** / **`IAvatarSourceFetcher`**
+- Projections add `avatarUrl` to `DropModel`, `Domain.Models.CommentModel`, `ConnectionModel`, `SharingRecipientModel`, and `UserModel` — two scalar columns riding navigations already in the query plan, so no new join and no extra round trip
+- `GoogleAuthService` records `payload.Picture` for new users only
+
+### Frontend Changes
+
+- **`UserAvatar.vue`** — the only place an avatar is rendered; falls back to initials on a missing URL or a load error
+- **`AvatarEditor.vue`** on the account page (always present), **`AvatarView.vue`** at `/onboarding/avatar`
+- `avatarApi.ts`, auth-store avatar state and actions, avatar router guard after First Moment
+- New `--fyli-primary-darker` token lifts the initials circle to a 5.46:1 contrast ratio
+
+### Deployment
+
+**Run `docs/migrations/AddUserAvatar.sql` before deploying the application.** Once the entity carries the columns, every EF query against `UserProfiles` names them. The columns are nullable and the current build ignores them, so running the script early is safe; the reverse order is an outage.
+
+Rollback means redeploying the previous build. Do not drop the columns.
+
+### Notes
+
+- Backwards compatible: no `Drop`, `Comment`, `UserUser`, `TagDrop`, or `TagViewer` row is read or written differently, and no permission check changed
+- A privately renamed connection keeps their own photo while showing the private name
+- `PersonModelV2` was deliberately left alone — it is persisted into `UserProfile.CurrentPeople`, not merely transported
+- `fyli-fe` and `fyli-html` are unchanged
+
+---
+
 ## 2026-09-19: Admin Usage metrics
 
 ### New Feature
