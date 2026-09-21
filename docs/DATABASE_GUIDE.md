@@ -36,7 +36,58 @@ dotnet ef migrations script <from_migration_name> --idempotent --project Domain 
 dotnet ef migrations script 20251207185045_transcode_update --idempotent --project Domain --startup-project Memento
 ```
 
-The `--idempotent` flag wraps each step in `IF NOT EXISTS` checks against `__EFMigrationsHistory`, making scripts safe to re-run.
+The `--idempotent` flag wraps each step in `IF NOT EXISTS` checks against
+`__EFMigrationsHistory`. **That table does not exist in production — the raw
+output will not run there.** See the next section.
+
+### !IMPORTANT! Migration scripts must be adapted before they will run in production
+
+`dotnet ef migrations script --idempotent` gates every statement on EF Core's
+`[__EFMigrationsHistory]`. **Production does not have that table** — its history
+table is EF6's `[__MigrationHistory]`. Raw EF output therefore fails on the first
+statement with:
+
+```
+Msg 208, Level 16, State 1
+Invalid object name '__EFMigrationsHistory'.
+```
+
+and applies **nothing**. If the application was deployed first, that is a total
+outage: every EF query against the changed table names the new columns.
+
+**Generate with EF, then rewrite the guards** to match the existing scripts in
+`docs/migrations/` (see `AddUserAvatar.sql` or `AddDropSortIndexes.sql`):
+
+| Change | Guard on |
+|---|---|
+| Add column | `IF COL_LENGTH(N'Table', N'Column') IS NULL` |
+| Create index | `IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = ... AND object_id = OBJECT_ID(...))` |
+| Create table | `IF OBJECT_ID(N'[Table]', N'U') IS NULL` |
+| History row | `IF OBJECT_ID(N'[__MigrationHistory]', N'U') IS NOT NULL`, **inside `EXEC(N'...')`** |
+
+Three rules that each caused a real failure:
+
+1. **Wrap any `[__MigrationHistory]` reference in `EXEC(N'...')`.** SQL Server
+   compiles a batch before evaluating a runtime `OBJECT_ID` guard, so a bare
+   reference still throws Msg 208 where the table is absent (every local dev DB).
+2. **Separate `ALTER TABLE ... ADD` from `CREATE INDEX` with `GO`.** A column
+   added in one batch cannot be referenced in the same batch.
+3. **A filtered index (`CREATE INDEX ... WHERE`) needs `SET QUOTED_IDENTIFIER ON`
+   and `SET ANSI_NULLS ON`** in the creating session. Put them at the top; SET
+   options are connection-level and persist across `GO`.
+
+**Test the finished script before handing it over.** The local SQL Server
+container has `sqlcmd`, so all three paths are cheap to verify:
+
+```bash
+docker cp docs/migrations/<Name>.sql sql_server_instance:/tmp/m.sql
+docker exec sql_server_instance /opt/mssql-tools18/bin/sqlcmd -C \
+  -S localhost -U SA -P '<pw>' -d Master -i /tmp/m.sql
+```
+
+Verify: (a) fresh apply, (b) re-run is a clean no-op, (c) no duplicate history row.
+
+**Deploy order is migration first, application second — never the reverse.**
 
 Save generated SQL to `docs/migrations/` and update the relevant TDD post creation.
 
