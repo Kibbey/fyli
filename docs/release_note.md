@@ -1,5 +1,33 @@
 # Release Notes
 
+## 2026-09-20: Tap an avatar to see the photo larger
+
+### New Feature
+
+**Any avatar with a photo opens in a lightbox**
+Clicking or tapping someone's photo — on a memory card, a comment, the connections list, a shared-memory page, or your own on the account page — opens it enlarged, with their name underneath. Escape, the close button, or clicking the backdrop dismisses it.
+
+It reuses the same lightbox treatment as the memory-photo gallery, so it reads as the existing pattern rather than a new one.
+
+### How It Works
+
+1. The enlarged photo is capped at `min(90vw, 512px)`. Avatars are stored as a single 256 × 256 JPEG, so that fills a phone screen and tops out at 2x upscale on a desktop; going full-screen would visibly soften a face and defeat the point
+2. Only a real photo is interactive — an initials circle has nothing to enlarge and stays inert
+3. Three deliberate exclusions: the nav avatar (already a link to your account) and the two sharing-recipient pickers, where the avatar sits inside the row-selection button. A button nested in a button is invalid HTML, and tapping a face would compete with selecting that person
+
+### Frontend Changes
+
+- **`UserAvatar.vue`** — optional `zoomable` (default on), teleported lightbox, focus moved into the dialog on open and returned to the trigger on close, body scroll locked while open
+- Opt-outs in `AppNav.vue`, `CreateMemoryView.vue`, `EditMemoryView.vue`, each covered by a regression test
+
+### Notes
+
+- Frontend only — no API, schema, or migration change, so no deploy ordering constraint
+- Sharpness is bounded by the stored 256 × 256 rendition. Raising `AvatarService.AvatarSize` to 512 would make zoom 1:1 and also fix the 96px account preview on 3x-DPR phones, which needs 288px today
+- The enlarged photo is circular, matching the style guide's avatar rule; that clips the corners of the square source
+
+---
+
 ## 2026-09-20: User avatars
 
 ### New Feature
