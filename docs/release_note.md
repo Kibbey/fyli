@@ -106,10 +106,16 @@ broken player.
 3. **A short fixed interval, bounded.** Check immediately, then every 500ms for
    at most 15 attempts (~7.5s), then fall back to a manual "Check if ready"
    button. Never slower than the 8s ceiling it replaces, usually much faster
-4. **Only a freshly created card polls.** An older card — including one whose
+4. **The checking is invisible.** While it polls, the card shows one steady
+   message and one continuously spinning indicator — the view does not change
+   between checks. A poll that swapped the card's contents fifteen times in
+   seven seconds read as flashing. Only a check you start yourself, with the
+   manual button, gets its own "Checking..." state, because that one is
+   feedback you asked for
+5. **Only a freshly created card polls.** An older card — including one whose
    transcode genuinely failed — goes straight to the manual button, so a
    permanently-unready video cannot cost requests on every stream render
-5. The status endpoint sits behind the same permission check as every other
+6. The status endpoint sits behind the same permission check as every other
    media read, and derives its S3 key the same way the memory endpoint does, so
    memories from before the transcoder switch resolve to the same object
 
