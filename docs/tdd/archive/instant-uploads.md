@@ -771,6 +771,26 @@ No `jsonb`/JSON columns. Every field is a discrete typed column.
 
 ## S3 Layout and Lifecycle
 
+> **Superseded on 2026-09-22, after deploy.** This section puts staging under a
+> `staging/` prefix inside the `cimplur` media bucket. It shipped that way, then
+> moved to a dedicated `cimplur-staging` bucket before the expiration rule was
+> ever applied to `cimplur`.
+>
+> The prefix design was safe — `userId` is an int, so live keys always begin
+> with a digit and cannot match `staging/` — but it made a *deletion* rule on
+> the bucket holding every memory photo, and its safety depended on every future
+> editor knowing the prefix was load-bearing. A separate bucket lets the rule be
+> stated with no prefix filter at all, which removes that class of mistake
+> rather than mitigating it. `cimplurthumbs` was already the precedent for a
+> purpose-specific bucket, which this design should have followed.
+>
+> Two consequences the original text gets wrong as a result: CORS was **not**
+> "already in place and unchanged" (a new bucket needs its own), and the
+> MediaConvert input is now a full `s3://` URI rather than a key, since input
+> and output are in different buckets. See
+> `docs/runbooks/s3-staging-lifecycle.md`.
+
+
 `ImageService.GetName` already prefixes non-production keys with `test/`
 (`ImageService.cs:257-266`), and `S3AvatarStorage.GetKey` follows the same
 convention (`S3AvatarStorage.cs:36-41`). **Staging keys mirror it**, which is why

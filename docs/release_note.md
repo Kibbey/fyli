@@ -26,8 +26,11 @@ stated plainly, because most memories are words.
    JPEG; a video is read in place by MediaConvert, which was going to read it
    from somewhere anyway. Neither passes through the app server
 3. **Abandoning is free.** Closing the tab mid-upload leaves an object that is
-   simply never claimed. A bucket lifecycle rule expires the staging prefix after
-   48 hours — there is no cleanup job, and no delete call anywhere in the code
+   simply never claimed. Staging lives in its own bucket, `cimplur-staging`,
+   which expires everything in it after 48 hours — there is no cleanup job, and
+   no delete call anywhere in the code. A separate bucket rather than a prefix
+   inside the media bucket means that expiration rule needs no prefix filter at
+   all, so there is nothing to mistype or widen onto parents' photos
 4. **A failed file never costs you the memory.** Claim reports per-file outcomes;
    the memory is created and you land on your stream regardless. The words are
    the memory
@@ -64,9 +67,10 @@ stated plainly, because most memories are words.
 - **Deploy order: migration first, application second.** Running
   `docs/migrations/AddStagedUpload.sql` early is safe — nothing in the currently
   deployed build reads the table
-- **The S3 lifecycle rule must be applied before the feature is useful**, and
-  must never be widened beyond the `staging/` prefixes. See
-  `docs/runbooks/s3-staging-lifecycle.md`
+- **`cimplur-staging` must exist, with CORS and its expiration rule**, before
+  staging works. If `fyli-task-role` cannot write to it, staging fails closed and
+  the client falls back to the legacy upload path — slower, but nothing breaks.
+  See `docs/runbooks/s3-staging-lifecycle.md`
 - Photos are still rendered for display exactly as before — same 2048px bound,
   same HEIC conversion, same EXIF rotation baked into pixels. The original is
   not stored, which is unchanged, and worth recording as a door that only closes:
