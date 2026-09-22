@@ -1,5 +1,162 @@
 # Release Notes
 
+## 2026-09-22: Uploads start the moment you pick a file
+
+### New Feature
+
+**Photos and videos upload while you type, not after you click Save**
+Picking a photo now starts uploading it immediately. By the time a parent has
+finished writing, the bytes have already moved, so Save creates the memory and
+attaches what is already there. Selecting eight photos, typing for thirty
+seconds, and clicking Save now lands on the stream with no visible upload phase
+at all.
+
+The picker also moved to the top of the form, above "What happened?", and is
+presented as an inviting tile rather than a bare file input — with "Optional"
+stated plainly, because most memories are words.
+
+### How It Works
+
+1. **A staging area, keyed by a token.** Media S3 keys are derived from the
+   memory's id, so nothing could upload until Save created it. A new
+   `StagedUploads` table breaks that dependency: each file gets an opaque token
+   and a user-scoped S3 key, with no memory involved
+2. **Save moves no bytes.** At save the memory is created normally and the
+   tokens are *claimed*. A photo is a server-side S3 copy of the already-rendered
+   JPEG; a video is read in place by MediaConvert, which was going to read it
+   from somewhere anyway. Neither passes through the app server
+3. **Abandoning is free.** Closing the tab mid-upload leaves an object that is
+   simply never claimed. A bucket lifecycle rule expires the staging prefix after
+   48 hours — there is no cleanup job, and no delete call anywhere in the code
+4. **A failed file never costs you the memory.** Claim reports per-file outcomes;
+   the memory is created and you land on your stream regardless. The words are
+   the memory
+5. **Retry is safe.** Claiming is idempotent for the same memory, and a
+   double-clicked Save cannot attach the same photo twice — the claim is taken
+   with a conditional update rather than a read-then-write check
+6. **Photos show progress too**, not just videos
+
+### Backend Changes
+
+- **`StagedUploads` table** (`AddStagedUpload`) — purely additive. Nothing on
+  `Drops`, `ImageDrops`, `MovieDrops`, or any table involved in who can view a
+  memory changed
+- **Five new endpoints** under `/api/uploads` — `stage/image`,
+  `stage/video/request`, `stage/video/refresh`, `stage/video/complete`, `claim`
+- **`StagedUploadService`**, `IStagedStorage` / `S3StagedStorage`, and a claim
+  handler per media kind resolved by a factory
+- `/api/images`, `/api/movies/upload/request`, and `/api/movies/upload/complete`
+  are untouched, so the old client, the comment flow, the edit flow, and the
+  question-answer flow all keep working — and remain a live fallback if staging
+  fails
+
+### Frontend Changes
+
+- **`useStagedUpload.ts`** — per-file state, a worker pool of 3 with videos
+  first, abort, retry, presigned-URL refresh, an honest remaining-time line, and
+  a fallback to the legacy upload path
+- **`MediaPicker.vue` / `UploadThumbnail.vue`** — the tile and the four
+  thumbnail states
+- **`uploadApi.ts`** — the five staging calls
+
+### Notes
+
+- **Deploy order: migration first, application second.** Running
+  `docs/migrations/AddStagedUpload.sql` early is safe — nothing in the currently
+  deployed build reads the table
+- **The S3 lifecycle rule must be applied before the feature is useful**, and
+  must never be widened beyond the `staging/` prefixes. See
+  `docs/runbooks/s3-staging-lifecycle.md`
+- Photos are still rendered for display exactly as before — same 2048px bound,
+  same HEIC conversion, same EXIF rotation baked into pixels. The original is
+  not stored, which is unchanged, and worth recording as a door that only closes:
+  no photo uploaded before an originals archive exists can be re-rendered later
+- Rolling back is a frontend revert; the table and endpoints simply go unused
+
+---
+
+## 2026-09-22: Videos are ready when the page says they are
+
+### Fix
+
+**A just-saved video now shows a placeholder that resolves itself**
+Saving a memory with a video used to sit for 2-8 seconds on a fixed timer,
+guessing at how long transcoding would take. That wait is gone. The card shows a
+short "being processed" placeholder instead, which checks for the finished video
+and swaps the player in as soon as it is there — usually on the first check.
+
+Saving a memory with a video is visibly faster, and on the rare occasion the
+video genuinely is not ready, the card says so honestly instead of rendering a
+broken player.
+
+### How It Works
+
+1. **A real readiness check.** `GET /api/movies/{id}/status` does one S3 metadata
+   lookup and reports whether the object exists, returning freshly signed links
+   when it does. The previous code had no way to ask this: the memory endpoint
+   builds media links from keys without testing whether anything is there
+2. **The links have to be fresh.** A presigned URL cannot be cache-busted —
+   appending a query parameter invalidates the signature — so retrying the
+   original link could never work. The status call returns new ones in the same
+   round trip
+3. **A short fixed interval, bounded.** Check immediately, then every 500ms for
+   at most 15 attempts (~7.5s), then fall back to a manual "Check if ready"
+   button. Never slower than the 8s ceiling it replaces, usually much faster
+4. **Only a freshly created card polls.** An older card — including one whose
+   transcode genuinely failed — goes straight to the manual button, so a
+   permanently-unready video cannot cost requests on every stream render
+5. The status endpoint sits behind the same permission check as every other
+   media read, and derives its S3 key the same way the memory endpoint does, so
+   memories from before the transcoder switch resolve to the same object
+
+### Backend Changes
+
+- **`GET /api/movies/{id}/status`** and `MovieService.GetStatusAsync`
+
+### Frontend Changes
+
+- **`VideoProcessingPlaceholder.vue`** moved to `components/media/` and gained
+  the bounded automatic check
+- **`MemoryCard.vue`** now renders it when a video is not yet available
+- `getTranscodeDelay` and its four call sites are gone
+
+### Notes
+
+- Deploy order: the backend endpoint must ship before or with the frontend. The
+  frontend degrades to the manual button if the endpoint is missing
+- The right long-term fix is to stop polling entirely: MediaConvert can publish
+  completion to SNS/EventBridge, and a `TranscodedAt` column fed from that would
+  let the memory endpoint report readiness directly
+
+---
+
+## 2026-09-22: A calmer capture form
+
+### Improvement
+
+**Photos come first, and the keyboard stays put on a phone**
+The photo picker moved above "What happened?" on the new-memory form, matching
+the order a parent actually works in: pick the photo, then say what it was.
+
+The First Moment capture screen no longer forces focus into the text box on a
+phone, where the keyboard slid up over the form before the parent had read it.
+On a larger screen, where there is nothing to cover, focus still moves as before.
+
+Photo uploads now show a percentage, which only videos did.
+
+### Frontend Changes
+
+- **`useIsSmallScreen.ts`** — Bootstrap `md` breakpoint, guarding programmatic
+  focus
+- **`mediaApi.uploadImage`** takes an optional progress callback
+- `videoProgress` renamed to `uploadProgress` across the three forms that use it
+
+### Notes
+
+- Frontend only — no API, schema, or migration change
+
+---
+
 ## 2026-09-20: Tap an avatar to see the photo larger
 
 ### New Feature

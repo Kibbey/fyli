@@ -49,13 +49,19 @@ These remain Bootstrap defaults so standard classes (`alert-danger`, `btn-succes
 
 ### Neutrals
 
-| Token | Hex | Usage |
-|---|---|---|
-| `--fyli-text` | `#212529` | Body text (Bootstrap default) |
-| `--fyli-text-muted` | `#6c757d` | Secondary text, timestamps |
-| `--fyli-bg` | `#ffffff` | Page background |
-| `--fyli-bg-light` | `#f8f9fa` | Section backgrounds, cards |
-| `--fyli-border` | `#dee2e6` | Borders, dividers |
+| Token | Hex | Usage | Defined? |
+|---|---|---|---|
+| `--fyli-text` | `#212529` | Body text (Bootstrap default) | **No** |
+| `--fyli-text-muted` | `#6c757d` | Secondary text, timestamps | Yes |
+| `--fyli-bg` | `#ffffff` | Page background | **No** |
+| `--fyli-bg-light` | `#f8f9fa` | Section backgrounds, cards | **No** |
+| `--fyli-border` | `#dee2e6` | Borders, dividers | **No** |
+
+> **Only `--fyli-text-muted` is actually declared in `main.css`.** The other four
+> are documented intent, not live tokens — `var(--fyli-bg)` resolves to nothing
+> and silently paints transparent, which has already caused one bug. Until they
+> are declared, reach for the Bootstrap equivalents (`bg-white`, `bg-light`,
+> `border`, `text-body`) rather than these names.
 
 ---
 
