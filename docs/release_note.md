@@ -1,5 +1,41 @@
 # Release Notes
 
+## 2026-09-22: Pinch to zoom on photos
+
+### New Feature
+
+**Open a photo and pinch it, the way you would in your camera roll**
+Tapping a photo in your stream has always opened it full screen, but it opened
+at one fixed size — a group shot from 1994 stayed a group shot, with no way to
+look closer at a face in the back row. You can now pinch to zoom in up to four
+times, drag with one finger to move around, and double-tap to jump straight to a
+closer look and back out again.
+
+### How It Works
+
+- **Pinch zooms around your fingers.** The point you pinch stays under your
+  fingers rather than the image lurching toward its center, so zooming in on a
+  face keeps that face where you put it
+- **One finger pans once zoomed**, and the photo cannot be dragged off screen —
+  it stops at its own edges
+- **Double-tap toggles.** One double-tap goes to a closer view centered where you
+  tapped, another returns to the full photo. Double-click does the same on a
+  desktop
+- **Swiping still moves between photos** when you are zoomed out. While zoomed
+  in, swipes pan instead of skipping to the next photo, and the left/right
+  arrows step out of the way
+- **Zoom resets** when you move to another photo, and Escape zooms out before it
+  closes the viewer
+
+### Files Changed
+
+**Frontend:**
+- `src/components/memory/PhotoGrid.vue` (updated) - pinch, pan, and double-tap
+  zoom in the gallery lightbox, used by the stream, memory detail, shared
+  memories, comments, and question answers
+- `src/components/memory/PhotoGrid.test.ts` (updated) - 15 tests covering zoom,
+  panning, gesture hand-off, and navigation while zoomed
+
 ## 2026-09-22: Uploads start the moment you pick a file
 
 ### New Feature
