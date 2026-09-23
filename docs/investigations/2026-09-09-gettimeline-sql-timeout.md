@@ -1,8 +1,10 @@
 # Investigation: Production GetTimeline SQL Timeout
 
-**Status:** 🟢 **ROOT CAUSE IDENTIFIED (Round 7): `RESOURCE_SEMAPHORE` — query memory grant starvation.** First explanation that accounts for every observation. Fix migration `20260918032350_AddDropSortIndexes` written, not yet applied to prod. Reopened 2026-09-17; — production telemetry shows the underlying condition was never fixed, only pushed below the 30s timeout. See Round 3, then **Round 4 (infrastructure)**, which corrects a wrong diagnosis made mid-Round-4 and is the current state.
+**Status:** ✅ **CLOSED (2026-09-19).** Resolved by three changes in combination: the missing sort
+indexes, the `Union` rewrite of the permission predicate, and resizing the instance to `db.t3.medium`.
+No single one of them was sufficient. See **[Final Resolution](#final-resolution--closed-2026-09-19)**.
 **Date opened:** 2026-09-09
-**Date resolved:** ~~2026-09-09~~ — reopened
+**Date closed:** 2026-09-19 (reopened once, 2026-09-17)
 
 ## Problem Statement
 
@@ -839,10 +841,11 @@ before any plan or index analysis.
 
 ---
 
-## Resolution
+## Interim Resolution (2026-09-09) — superseded, kept for history
 
-> ⚠️ **Superseded by Round 3 (2026-09-17).** This section describes how the *incident* was
-> stopped, not the root cause. Production telemetry shows the home feed running 25s against a
+> ⚠️ **Superseded by Round 3 (2026-09-17), and closed out by the
+> [Final Resolution](#final-resolution--closed-2026-09-19) below.**
+> This section describes how the *first* incident was stopped, not the root cause. Production telemetry shows the home feed running 25s against a
 > 30s timeout. Read Round 3 before acting on anything below.
 
 **Root Cause:** Prod was missing secondary indexes that the 2021 EF Initial migration declared (H9). Combined with a likely stale plan (reboot cleared the plan cache — H8). `GetTimelineDrops` recovered after indexes + SQL Server reboot.
@@ -862,3 +865,110 @@ before any plan or index analysis.
 5. **Covering composites** if EXISTS still show up in plans: `UserDrops (UserId, DropId)`, `NetworkDrops (DropId, UserTagId)`. `Drops.Date` only after the rewrite, for `ORDER BY Date` on one timeline.
 6. **Keyset pagination** instead of `OFFSET` if deep `skip` becomes slow. Reducing `take` from 50 to 15 matches the main feed but is a UX tradeoff.
 7. Do not raise `CommandTimeout` as the fix. `CanView` should check one drop, not `GetAllDrops().Any(DropId)`.
+
+
+---
+
+## Final Resolution — CLOSED (2026-09-19)
+
+**The timeout is resolved. Production is stable.**
+
+No single change fixed it. Three did, in combination — which is why each round that tested one
+cause in isolation produced a real measurement and a wrong conclusion.
+
+### The three causes
+
+| # | Cause | Fix | Status |
+|---|---|---|---|
+| 1 | **Missing sort indexes.** `Drops` had no index on `Date` or `Created`, the `ORDER BY` columns. Every page requested a memory grant large enough to sort the whole visible set. | `20260918032350_AddDropSortIndexes` — `IX_Drop_Created`, `IX_Drop_Date` | ✅ Applied to prod |
+| 2 | **Poor query patterns.** The 3-way `OR` permission predicate let the optimizer fall back to scanning `Drops`, inflating both the row estimate and the grant. | `Union` of three seeks in `GetAllDrops` (`DropsService.cs:553-554`) | ✅ Shipped (Round 6) |
+| 3 | **SQL Server could not function on a `db.t3.small`.** 2 GB total with `FreeableMemory` ~178 MB (Round 4). | Resized to **`db.t3.medium`** (4 GB, still burstable, still Express) | ✅ Applied |
+
+### Why the resize worked — and what it did *not* do
+
+This is the part worth remembering, because Round 7 got the mechanism right but drew the wrong
+conclusion from it.
+
+Express caps `max server memory` at **1410 MB regardless of instance size**. The resize therefore
+**did not raise the ceiling**. What it did was give the OS enough headroom that SQL Server could
+finally *reach* a ceiling it had never been getting near — on the 2 GB box, with ~178 MB freeable,
+Express could not approach its own 1410 MB cap, so the effective grant pool was a fraction of the
+nominal one.
+
+Causes 1 and 2 cut **demand** on the grant pool. Cause 3 made the **supply** match what the engine
+was already licensed to use. Fixing demand alone pushed the query below the 30s timeout without
+removing the starvation (that was Round 6's result, and why the incident reopened). Fixing supply
+alone would not have helped either, because the grants were genuinely oversized.
+
+### Correction to Round 4
+
+Round 4 advised: *"Do not resize to `db.t3.medium` — same 20% baseline, no improvement. Only a
+non-burstable class…"*
+
+**That was wrong, and it delayed the fix.** It was correct that `t3.medium` has the same CPU baseline
+as `t3.small` — but by Round 7 the binding constraint had been shown to be memory, not CPU, and
+`t3.medium` doubles RAM. The advice was sound for the diagnosis current when it was written and
+was never revisited once the diagnosis changed. Worth flagging as a process failure, not just a
+technical one: superseded recommendations need retracting explicitly.
+
+### Method note (retained from Round 7)
+
+Four diagnoses were falsified before the right one: missing indexes as *root cause*, CPU throttling,
+query shape as *binding constraint*, and lock blocking. Each rested on a real measurement of the
+wrong thing. The wait type was decisive and was available from the first round —
+`sys.dm_exec_requests` and `sys.dm_os_wait_stats` should be the **first** diagnostic for any
+"slow in prod, fast locally" report, before any plan or index analysis.
+
+The deeper lesson is the one the table above encodes: when three causes compound, testing each in
+isolation falsifies each in turn. Rounds 5 and 6 both measured correctly and concluded wrongly for
+exactly this reason.
+
+---
+
+## Still open after closure
+
+These did **not** ship, and the investigation is being closed without them because production is
+stable. They are recorded as known scaling risks, not as outstanding bugs.
+
+### 1. `GetTimelineDrops` still drives from all permission-visible drops
+
+`DropsService.cs:221-223` — unchanged:
+
+```csharp
+var drops = GetAllDrops(currentUserId);
+//only pull in drops from the specific timeline
+drops = drops.Where(x => x.TimelineDrops.Any(a => a.TimelineId == timelineId));
+```
+
+The Round 6 follow-up to invert this — drive from `TimelineDrops` (PK `(TimelineId, DropId)`, a cheap
+seek) and apply permission to that small set — was never applied. `GetAlbumDrops`
+(`DropsService.cs:239-241`) has the identical shape. `TimelineShareLinkService.GetPreviewByTokenAsync`
+already does it the right way and is the reference implementation.
+
+**Why it matters:** the indexes and the extra RAM bought headroom, they did not change the
+complexity. This query still scales with total visible drops per user rather than with drops in
+the requested timeline. It will return as the largest accounts grow.
+
+### 2. `MapDrops` projection hygiene
+
+- Six dead `Include` calls (`DropsService.cs:326-333`) — EF Core ignores `Include` when the query
+  terminates in a `Select`.
+- No `AsSplitQuery()`. `QuestionService` already uses it for a comparable nested graph.
+- No `AsNoTracking()` on a read-only path.
+- The Tags projection runs `tagIds.Contains(x.UserTagId)` against an empty list on both the
+  `GetTimeline` and `GetAlbum` paths, which pass `new List<long>()`.
+
+### 3. `CanView` is still `GetAllDrops(userId).Any(x => x.DropId == dropId)`
+
+`DropsService.cs:117` — builds the full permission query to check a single drop.
+
+### 4. Both remaining Express ceilings are intact
+
+| Ceiling | Value | Note |
+|---|---|---|
+| Buffer pool | **1410 MB** | Now reachable, but not raised. `t3.medium` gives headroom, not more usable cache. |
+| Database size | **10 GB** | Untouched by any of this. A hard stop on writes, not a slowdown. |
+
+The 10 GB cap is a forcing function with a date attached, and it is the primary argument in
+**`docs/DATABASE_ENGINE_MIGRATION_EVALUATION.md`**. Measuring current database size against it —
+and the monthly growth rate — is the highest-value follow-up from this entire investigation.
